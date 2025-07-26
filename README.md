@@ -61,7 +61,7 @@
 
 ```bash
 python badg3rfuzz.py \
-  --site-key 6LemxMwUAAAAABCD1234XYZ \
+  --site-key 6LfKj9EpAAAAAP8xQ7R2vN5mT6wU3bY8zC1dE4fG \
   --captcha-action login \
   --login-url https://targetsite.com/login \
   --post-url https://targetsite.com/api/login \
@@ -78,7 +78,7 @@ python badg3rfuzz.py \
 ### With User Fuzzer and Chrome WebDriver
 ```bash
 python badg3rfuzz.py \
-  --site-key 6LemxMwUAAAAABCD1234XYZ \
+  --site-key 6LfKj9EpAAAAAP8xQ7R2vN5mT6wU3bY8zC1dE4fG \
   --captcha-action submit_form \
   --login-url https://secure.example.com/auth \
   --post-url https://secure.example.com/api/auth \
@@ -94,7 +94,7 @@ python badg3rfuzz.py \
 ### With Mixed Fuzzer and No Banner
 ```bash
 python badg3rfuzz.py \
-  --site-key 6LemxMwUAAAAABCD1234XYZ \
+  --site-key 6LfKj9EpAAAAAP8xQ7R2vN5mT6wU3bY8zC1dE4fG \
   --captcha-action login \
   --login-url https://example.com/login \
   --post-url https://example.com/auth \
