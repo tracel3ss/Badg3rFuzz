@@ -1,8 +1,6 @@
-```markdown
 # 🦡 Badg3rFuzz
 
 ```
-
 ╔══════════════════════════════════════════════════════════════════════════════╗
 ║                                                                              ║
 ║        ██████╗  █████╗ ██████╗  ██████╗ ██████╗ ██████╗                      ║
@@ -16,43 +14,44 @@
 ║                                                                              ║
 ║                  🦡 Badg3rFuzz - Fuzzing & brute force with reCAPTCHAv3 🦡  ║
 ╚══════════════════════════════════════════════════════════════════════════════╝
+```
 
-````
-
-**Badg3rFuzz** es una herramienta para realizar fuzzing y ataques de fuerza bruta en formularios protegidos con reCAPTCHA v3, combinando Selenium para la obtención automática del token y múltiples hilos para maximizar la velocidad.
-
----
-
-## 🔥 Características principales
-
-- Compatible con reCAPTCHA v3 (`site-key` + `action`)
-- Soporte para fuerza bruta de usuarios y contraseñas
-- Generación automática de fuzzers para usuarios
-- Multihilo configurable para paralelizar ataques
-- Detención automática al encontrar credenciales válidas (`--stop-on-success`)
-- Registro detallado en archivo `.log`
-- Soporte para cabecera `Origin` personalizada para requests
-- Manejo limpio de `Ctrl+C` para detener la ejecución
+**Badg3rFuzz** is a tool designed for fuzzing and brute-forcing forms protected with reCAPTCHA v3. It combines Selenium for automatic token retrieval and multithreading to maximize speed.
 
 ---
 
-## 💻 Requisitos y compatibilidad
+## 🔥 Key Features
 
-- Python 3.7+
-- Google Chrome instalado en el sistema:
-  - En Windows: Instalar Chrome desde [https://google.com/chrome](https://google.com/chrome)
-  - En Linux (Debian/Ubuntu): `sudo apt install google-chrome-stable` o usar Chrome/Chromium oficial
-- Paquetes Python:
+* Supports reCAPTCHA v3 (`site-key` + `action`)
+* Brute force for usernames and passwords
+* Automatic user fuzzers generation
+* Configurable multithreading for parallel attacks
+* Auto-stop on successful credential discovery (`--stop-on-success`)
+* Detailed logging to `.log` file
+* Support for custom `Origin` HTTP header
+* Clean handling of `Ctrl+C` to stop execution gracefully
+
+---
+
+## 💻 Requirements and Compatibility
+
+* Python 3.7+
+* Google Chrome installed on your system:
+
+  * Windows: Install Chrome from [https://google.com/chrome](https://google.com/chrome)
+  * Linux (Debian/Ubuntu): `sudo apt install google-chrome-stable` or official Chrome/Chromium
+* Python packages:
+
   ```bash
   pip install -r requirements.txt
-````
+  ```
 
-* Entornos Unix/Windows funcionan igual, pero en Windows se recomienda ejecutar en CMD/Powershell con permisos adecuados y evitar rutas con espacios en los nombres.
-* El script utiliza Selenium con `webdriver-manager` para manejar automáticamente la versión compatible de `chromedriver`.
+- Unix and Windows environments behave similarly, but on Windows it is recommended to run from CMD/Powershell with proper permissions and avoid paths with spaces.
+- The script uses Selenium with `webdriver-manager` to automatically manage the matching `chromedriver` version.
 
 ---
 
-## 🚀 Uso básico
+## 🚀 Basic Usage
 
 ```bash
 python badg3rscan.py \
@@ -68,7 +67,7 @@ python badg3rscan.py \
 
 ---
 
-## ⚙️ Uso con fuzzer para usuarios y cabecera Origin
+## ⚙️ Usage with User Fuzzer and Origin Header
 
 ```bash
 python badg3rscan.py \
@@ -83,76 +82,69 @@ python badg3rscan.py \
   --stop-on-success
 ```
 
-* `--user-fuzz digits:6:8:500` genera 500 usuarios numéricos de longitud entre 6 y 8 caracteres.
-* `--origin-url` fija las cabeceras HTTP `Origin` y `Referer` (útil para evitar bloqueos CORS o validaciones estrictas).
+* `--user-fuzz digits:6:8:500` generates 500 numeric usernames between 6 and 8 characters long.
+* `--origin-url` sets the HTTP `Origin` and `Referer` headers (useful to avoid CORS blocks or strict validation).
 
 ---
 
-## 📋 Parámetros
+## 📋 Parameters
 
-| Parámetro           | Descripción                                                                                     | Obligatorio    |
-| ------------------- | ----------------------------------------------------------------------------------------------- | -------------- |
-| `--site-key`        | Clave pública del reCAPTCHA que se usa para obtener tokens                                      | Sí             |
-| `--captcha-action`  | Acción (action) que se asocia al reCAPTCHA (ej: `login`, `submit_form`)                         | Sí             |
-| `--login-url`       | URL donde se carga el formulario y el widget de reCAPTCHA                                       | Sí             |
-| `--post-url`        | URL que recibe la solicitud POST con las credenciales                                           | Sí             |
-| `--pass-file`       | Archivo con las contraseñas (una por línea)                                                     | No\*           |
-| `--user-file`       | Archivo con los nombres de usuario (uno por línea)                                              | No\*           |
-| `--user-fuzz`       | Fuzzer para generar usuarios automáticamente, formato `tipo:min_len:max_len:cantidad`           | No\*           |
-| `--threads`         | Número de hilos paralelos para enviar peticiones                                                | No (default 5) |
-| `--stop-on-success` | Detiene el proceso cuando se encuentra una credencial válida                                    | No             |
-| `--origin-url`      | URL para la cabecera HTTP `Origin` y `Referer` (útil para sitios que verifican estas cabeceras) | No             |
-| `--no-banner`       | Desactiva la impresión del banner en ASCII                                                      | No             |
+| Parameter           | Description                                                                                 | Required       |
+| ------------------- | ------------------------------------------------------------------------------------------- | -------------- |
+| `--site-key`        | Public reCAPTCHA key used to obtain tokens                                                  | Yes            |
+| `--captcha-action`  | Action associated with the reCAPTCHA (e.g., `login`, `submit_form`)                         | Yes            |
+| `--login-url`       | URL where the form and reCAPTCHA widget are loaded                                          | Yes            |
+| `--post-url`        | URL that receives the POST request with credentials                                         | Yes            |
+| `--pass-file`       | File containing passwords (one per line)                                                    | No\*           |
+| `--user-file`       | File containing usernames (one per line)                                                    | No\*           |
+| `--user-fuzz`       | Fuzzer to generate usernames automatically, format: `type:min_len:max_len:count`            | No\*           |
+| `--threads`         | Number of parallel threads for sending requests                                             | No (default 5) |
+| `--stop-on-success` | Stops the process once valid credentials are found                                          | No             |
+| `--origin-url`      | URL used in HTTP `Origin` and `Referer` headers (useful for sites that check these headers) | No             |
+| `--no-banner`       | Disables the ASCII banner printing                                                          | No             |
 
-\* Si no se especifica `--user-file` y `--user-fuzz`, se generan usuarios numéricos por defecto. Si no se especifica `--pass-file`, se genera un fuzzer fuerte para passwords.
-
----
-
-## 📈 To-Do / Mejoras futuras
-
-* [ ] Integración con proxies para anonimizar peticiones
-* [ ] Soporte para reCAPTCHA v2 / desafíos visibles
-* [ ] Implementar pausa y reanudación más robusta con checkpointing
-* [ ] Incorporar soporte para múltiples tipos de autenticación/formularios
-* [ ] Mejorar detección automática de éxito/error con análisis dinámico de respuestas
-* [ ] Añadir reportes más detallados en formato JSON o CSV
-* [ ] Mejorar la interfaz con menú interactivo o GUI web básica
+\* If neither `--user-file` nor `--user-fuzz` is specified, numeric usernames are generated by default. If no `--pass-file` is provided, a strong password fuzzer is used.
 
 ---
 
-## ☕ ¿Quieres invitarme un café?
+## 📈 To-Do / Future Improvements
 
-Si te gusta Badg3rFuzz y quieres apoyarme para seguir mejorando herramientas y aprendiendo, puedes invitarme un café.
+* [ ] Proxy integration for anonymizing requests
+* [ ] Support for reCAPTCHA v2 / visible challenges
+* [ ] Robust pause and resume with checkpointing
+* [ ] Support for multiple authentication types/forms
+* [ ] Improved automatic success/error detection via dynamic response analysis
+* [ ] More detailed reporting in JSON or CSV formats
+* [ ] Enhanced interface with interactive menu or basic web GUI
 
+---
 
-```markdown
+## ☕ Buy Me a Coffee?
 
-Si quieres apoyar mi trabajo, puedes hacerlo aquí:
+If you like Badg3rFuzz and want to support me to keep improving tools and learning, you can buy me a coffee.
+
+Support my work here:
 
 [![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/X8X61IO019)
-```
-
-Solo cambia el enlace a tu perfil personal.
-
-Para pagos en criptomonedas, PayPal o Patreon, puedes añadir secciones similares con tus links.
 
 ---
 
-## 🔧 Instalación rápida
+## 🔧 Quick Installation
 
 ```bash
-git clone https://github.com/tuusuario/badg3rfuzz.git
+git clone https://github.com/yourusername/badg3rfuzz.git
 cd badg3rfuzz
 pip install -r requirements.txt
 ```
 
 ---
 
-## 📞 Contacto
+## 📞 Contact
 
-Si tienes dudas o sugerencias, abre un issue en GitHub.
+If you have questions or suggestions, please open an issue on GitHub.
 
 ---
 
-¡Gracias por usar Badg3rFuzz! 🦡💥
-```
+Thanks for using Badg3rFuzz! 🦡💥
+
+---
