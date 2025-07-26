@@ -1,0 +1,67 @@
+# Archivos generados por Badg3rFuzz
+*.log
+results/
+captchas/
+
+# Entornos virtuales
+venv/
+.env/
+.venv/
+env/
+
+# Archivos de configuración sensible
+config.ini
+secrets.py
+*.key
+*.pem
+
+# Archivos de sistema y editor
+.DS_Store
+.idea/
+.vscode/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
+# Archivos de compilación y distribución
+build/
+dist/
+*.egg-info/
+*.egg
+*.manifest
+*.spec
+
+# Archivos de instalación
+pip-selfcheck.json
+
+# Archivos de prueba y cobertura
+.coverage
+htmlcov/
+.tox/
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# Archivos temporales
+*.tmp
+*.bak
+*~
+
+# Archivos de base de datos
+*.db
+*.sqlite3
+
+# Archivos de Selenium
+chromedriver.log
+geckodriver.log
+
+# Archivos de caché de Python
+.python-version
+
+# Archivos de macOS
+._*
+
+# Archivos de Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
