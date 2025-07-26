@@ -65,3 +65,8 @@ geckodriver.log
 Thumbs.db
 ehthumbs.db
 Desktop.ini
+
+#Binarios y logs
+*.error
+*.log
+*.exe
