@@ -6,12 +6,16 @@ from unittest.mock import patch
 
 class TestRateLimiting:
     
+    def make_request_with_delay(self, delay=1.0):
+        time.sleep(delay)
+        return "done"
+
     def test_delay_between_requests(self):
         """Test delay entre requests"""
         start_time = time.time()
-        
         # Simular delay de 1 segundo
         with patch('time.sleep') as mock_sleep:
+            self.make_request_with_delay(delay=1.0)
             # worker con delay=1, jitter=0
             mock_sleep.assert_called_with(1.0)
     

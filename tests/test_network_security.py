@@ -2,7 +2,17 @@
 import pytest
 from unittest.mock import patch, Mock
 import requests
+import tempfile
+import os
+import sys
 
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+
+# Importar funciones del módulo principal
+from badg3rfuzz import (
+     cargar_diccionario, cargar_user_agents, cargar_proxies,
+     check_success, generar_fuzzers, convert_der_to_pem_if_needed
+ )
 
 class TestNetworkSecurity:
     
@@ -30,8 +40,8 @@ class TestNetworkSecurity:
             cert_file.write(b'-----BEGIN CERTIFICATE-----\ntest\n-----END CERTIFICATE-----')
             cert_file.flush()
             
-            # result = convert_der_to_pem_if_needed(cert_file.name)
-            # assert result == cert_file.name  # Ya es PEM
+            result = convert_der_to_pem_if_needed(cert_file.name)
+            assert result == cert_file.name  # Ya es PEM
             
             os.unlink(cert_file.name)
     

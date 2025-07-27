@@ -1,6 +1,7 @@
 # tests/test_error_handling.py - Tests de manejo de errores
 import pytest
 from unittest.mock import patch, Mock
+from requests.exceptions import ProxyError
 import requests
 
 
@@ -25,7 +26,7 @@ class TestErrorHandling:
     def test_proxy_failure_handling(self):
         """Test manejo de fallos de proxy"""
         with patch('requests.Session.post') as mock_post:
-            mock_post.side_effect = requests.ProxyError("Proxy connection failed")
+            mock_post.side_effect = ProxyError("Proxy connection failed")
             
             # Verificar manejo de error de proxy
             pass

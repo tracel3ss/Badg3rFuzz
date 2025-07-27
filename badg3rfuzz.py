@@ -102,36 +102,26 @@ def signal_handler(signum, frame):
         pass
 
 def convert_der_to_pem_if_needed(cert_path):
-    """
-    Convierte certificado DER a PEM si es necesario y retorna la ruta del archivo PEM
-    """
     if not cert_path or not os.path.exists(cert_path):
         return cert_path
     
     try:
-        # Intentar leer como PEM primero
         with open(cert_path, 'rb') as f:
             cert_data = f.read()
-        
-        # Verificar si ya es PEM
         if b'-----BEGIN CERTIFICATE-----' in cert_data:
             return cert_path
-        
-        # Crear archivo temporal para PEM
+
         temp_fd, temp_pem_path = tempfile.mkstemp(suffix='.pem', prefix='badg3r_cert_')
         os.close(temp_fd)
 
-        # Intentar conversión con OpenSSL
         try:
-            # Comando OpenSSL para convertir DER a PEM
             cmd = [
-                'openssl', 'x509', 
-                '-inform', 'DER', 
-                '-in', cert_path, 
-                '-out', temp_pem_path, 
+                'openssl', 'x509',
+                '-inform', 'DER',
+                '-in', cert_path,
+                '-out', temp_pem_path,
                 '-outform', 'PEM'
             ]
-            
             result = subprocess.run(cmd, capture_output=True, text=True, timeout=10)
             if result.returncode == 0:
                 print(f"{GREEN}[i] Converted DER to PEM successfully: {temp_pem_path}{RESET}")
@@ -140,28 +130,32 @@ def convert_der_to_pem_if_needed(cert_path):
                 print(f"{RED}[!] OpenSSL conversion failed: {result.stderr.strip()}{RESET}")
                 try:
                     os.remove(temp_pem_path)
-                except:
+                except Exception:
                     pass
                 return None
+
         except FileNotFoundError:
             print(f"{RED}[!] OpenSSL not found in system PATH{RESET}")
             print(f"{YELLOW}[!] Please install OpenSSL or convert certificate manually:{RESET}")
             print(f"{YELLOW}    openssl x509 -inform DER -in {cert_path} -out {cert_path}.pem{RESET}")
             try:
                 os.remove(temp_pem_path)
-            except:
+            except Exception:
                 pass
             return None
+
         except subprocess.TimeoutExpired:
             print(f"{RED}[!] OpenSSL conversion timeout{RESET}")
             try:
                 os.remove(temp_pem_path)
-            except:
+            except Exception:
                 pass
-            return None  
+            return None
+
     except Exception as e:
         print(f"{RED}[!] Error reading certificate file: {e}{RESET}")
         return None
+
 
 def generar_token_y_cookie(site_key, captcha_action, login_url, webdriver_type="firefox", verbose=False):
     if stop_event.is_set() or success_flag.is_set():
@@ -847,5 +841,5 @@ def main():
         cleanup_temp_certs()
         os._exit(0)  # Salida forzada inmediata
 
-if __name__ == "__main__":
+if __name__ == "__main__": # pragma: no cover
    main()
