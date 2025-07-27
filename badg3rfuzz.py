@@ -609,7 +609,7 @@ def parse_user_fuzzer(fuzzer_str):
         raise ValueError(f"Invalid format for --user-fuzz: {fuzzer_str}. Must be type:min_len:max_len:count")
 
 def mostrar_barra_progreso():
-    global total_attempts, attempts_done, start_time_prog
+    global start_time_prog
     if start_time_prog is None:
         start_time_prog = time.time()
 
