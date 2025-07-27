@@ -122,7 +122,7 @@ def convert_der_to_pem_if_needed(cert_path):
                 '-out', temp_pem_path,
                 '-outform', 'PEM'
             ]
-            result = subprocess.run(cmd, capture_output=True, text=True, timeout=10)
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=10, shell=False)
             if result.returncode == 0:
                 print(f"{GREEN}[i] Converted DER to PEM successfully: {temp_pem_path}{RESET}")
                 return temp_pem_path
@@ -130,7 +130,7 @@ def convert_der_to_pem_if_needed(cert_path):
                 print(f"{RED}[!] OpenSSL conversion failed: {result.stderr.strip()}{RESET}")
                 try:
                     os.remove(temp_pem_path)
-                except Exception:
+                except FileNotFoundError:
                     pass
                 return None
 
