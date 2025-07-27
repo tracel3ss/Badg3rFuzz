@@ -45,6 +45,11 @@ attempts_lock = threading.Lock()
 start_time_prog = None
 stop_event = threading.Event()
 
+# Globales y flags
+combo_queue = queue.Queue()
+success_flag = threading.Event()
+print_lock = threading.Lock()
+
 # Banner y funciones de impresión
 def print_banner():
     # Códigos de color ANSI
@@ -82,17 +87,18 @@ def print_footer(start_time):
     print(f"{GREEN}[ ✔ ] Finished Attacks. Total: {attempts_done}{RESET}")
     print(f"\n⌛ Finished: {end_time.strftime('%d-%m-%Y %H:%M:%S')} (duration {dur})\n")
 
-# Globales y flags
-combo_queue = Queue()
-success_flag = threading.Event()
-print_lock = threading.Lock()
 
 # Handler para señales
 def signal_handler(signum, frame):
     print(f"\n{YELLOW}[!] Received signal ({signum}), starting clean finish...{RESET}")
     stop_event.set()
-    success_flag.set()  # Para que los threads salgan de sus loops
-
+    # Limpiar la cola inmediatamente para evitar bloqueos
+    try:
+        while True:
+            combo_queue.get_nowait()
+            combo_queue.task_done()
+    except queue.Empty:
+        pass
 def generar_token_y_cookie(site_key, captcha_action, login_url, webdriver_type="firefox", verbose=False):
     if stop_event.is_set() or success_flag.is_set():
         raise Exception("Operation cancelled by user")
@@ -373,7 +379,7 @@ def check_success(response, success_indicators, fail_indicators, success_codes, 
     return False, f"No success indicators found (HTTP: {response.status_code})"
 
 def login_attempt(username, password, site_key, captcha_action, login_url, post_url, origin_url=None, 
-                  webdriver_type="firefox", verbose=False, user_agent=None, proxy=None, proxy_timeout=10):
+                  webdriver_type="firefox", verbose=False, user_agent=None, proxy=None, proxy_timeout=20):
     # Verificar si debemos parar antes de crear WebDriver
     if stop_event.is_set() or success_flag.is_set():
         raise Exception("Operation cancelled")    
@@ -381,7 +387,7 @@ def login_attempt(username, password, site_key, captcha_action, login_url, post_
     headers = {
         "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
         "X-Requested-With": "XMLHttpRequest",
-        "User-Agent": user_agent if user_agent else "Mozilla/5.0",  # MODIFICAR esta línea        
+        "User-Agent": user_agent if user_agent else "Mozilla/5.0",        
         "Origin": origin_url if origin_url else login_url.split("/")[0],
         "Referer": login_url,
         "Accept": "*/*"
@@ -405,6 +411,18 @@ def login_attempt(username, password, site_key, captcha_action, login_url, post_
             s.proxies.update(proxies_dict)
         
         # Configurar timeout
+        if verbose:
+            req = requests.Request("POST", post_url, headers=headers, data=data)
+            prepared = s.prepare_request(req)
+            print("\n=== REQUEST DEBUG ===")
+            print(f"URL: {prepared.url}")
+            print(f"Method: {prepared.method}")
+            print("Headers:")
+            for k, v in prepared.headers.items():
+                print(f"  {k}: {v}")
+            print("\nBody:")
+            print(prepared.body.decode() if isinstance(prepared.body, bytes) else prepared.body)
+            print("=====================\n")
         response = s.post(post_url, headers=headers, data=data, timeout=proxy_timeout)
     return response
 
@@ -426,11 +444,7 @@ def worker(site_key, captcha_action, login_url, post_url, origin_url, stop_on_su
             # Timeout más corto para que el thread sea más responsivo a las señales
             username, password = combo_queue.get(timeout=0.5)
         except queue.Empty:
-            # Si no hay más elementos y algún evento está set, salir
-            if success_flag.is_set() or stop_event.is_set():
-                break
-            else:
-                continue
+            break
         # Seleccionar user agent rotativo
         current_ua = user_agents[ua_index % len(user_agents)]
         ua_index += 1
@@ -441,9 +455,6 @@ def worker(site_key, captcha_action, login_url, post_url, origin_url, stop_on_su
             
         try:
             # Verificar eventos antes de intentar login
-            if stop_event.is_set() or success_flag.is_set():
-                combo_queue.task_done()
-                break
             response = login_attempt(username, password, site_key, captcha_action, login_url, post_url, origin_url, 
                                      webdriver_type, verbose, current_ua, current_proxy, proxy_timeout)
             # Rotar proxy si hay múltiples
@@ -502,8 +513,11 @@ def worker(site_key, captcha_action, login_url, post_url, origin_url, stop_on_su
             # Actualizar contador y marcar tarea como completada
             with attempts_lock:
                 attempts_done += 1
-            combo_queue.task_done()
-            
+            try:
+                combo_queue.task_done()
+            except ValueError:
+                # Ya fue marcada como completada
+                pass            
 
 def parse_user_fuzzer(fuzzer_str):
     # formato tipo:min_len:max_len:cantidad
@@ -566,30 +580,23 @@ def cleanup_and_exit(threads, start_time):
     
     # Establecer eventos de parada
     stop_event.set()
-    success_flag.set()
     
     # Forzar cierre de todos los WebDrivers activos
     force_kill_drivers()
     
-    # Limpiar la cola para evitar bloqueos
-    while not combo_queue.empty():
-        try:
-            combo_queue.get_nowait()
-            combo_queue.task_done()
-        except queue.Empty:
-            break
-    
-    # Esperar a que terminen todos los threads con timeout MUY CORTO
-    print(f"{YELLOW}[!] Waiting threads to finish...{RESET}")
-    for i, t in enumerate(threads):
-        try:
-            t.join(timeout=1.0)  # Timeout MÁS CORTO: 1 segundo
-            if t.is_alive():
-                print(f"{YELLOW}[!] Thread {i+1} forced to terminate{RESET}")
-        except:
-            pass
-    
+    print(f"{YELLOW}[!] Forcing threads termination...{RESET}")
     print_footer(start_time)
+
+def wait_for_threads(threads, timeout=3):
+    """Esperar threads con timeout agresivo"""
+    for i, t in enumerate(threads):
+        if t.is_alive():
+            try:
+                t.join(timeout=timeout)
+                if t.is_alive():
+                    print(f"{YELLOW}[!] Thread {i+1} timeout - forcing exit{RESET}")
+            except:
+                pass
 
 def force_kill_drivers():
     """Fuerza el cierre de todos los drivers activos"""
@@ -609,11 +616,7 @@ def force_kill_drivers():
     if sys.platform == "win32":
         try:
             import subprocess
-            subprocess.run(['taskkill', '/f', '/im', 'firefox.exe'], 
-                          stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
             subprocess.run(['taskkill', '/f', '/im', 'geckodriver.exe'], 
-                          stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-            subprocess.run(['taskkill', '/f', '/im', 'chrome.exe'], 
                           stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
             subprocess.run(['taskkill', '/f', '/im', 'chromedriver.exe'], 
                           stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
@@ -648,7 +651,7 @@ def main():
     parser.add_argument("--verbose", action="store_true", help="Activa impresión detallada", default=False)
     parser.add_argument("--proxy", help="Proxy único formato http://user:pass@host:port o http://host:port")
     parser.add_argument("--proxy-file", help="Archivo con lista de proxies (uno por línea)")
-    parser.add_argument("--proxy-timeout", type=int, default=10, help="Timeout para conexiones proxy en segundos")
+    parser.add_argument("--proxy-timeout", type=int, default=20, help="Timeout para conexiones proxy en segundos")
     args = parser.parse_args()
     if args.no_banner == False:
         print_banner()
@@ -679,9 +682,7 @@ def main():
     print(f"[>] Fuzzing in progress...")
     threads = []
     
-    # Lanzar hilo de barra de progreso
-    barra_thread = threading.Thread(target=mostrar_barra_progreso, daemon=True)
-    barra_thread.start()
+    
     # Preparar patrones combinados
     combined_success = get_combined_patterns(args.success_indicators, "success")
     combined_fail = get_combined_patterns(args.fail_indicators, "fail")
@@ -714,31 +715,42 @@ def main():
         # Pausa para inicialización limpia
         time.sleep(0.5)
 
-        # Lanzar barra de progreso
-        barra_thread = threading.Thread(target=mostrar_barra_progreso, daemon=True)
-        barra_thread.start()
-
         # Iniciar todos los threads worker
         for t in threads:
             t.start()
             time.sleep(0.1)  # Pequeño delay entre inicios
+        
+        # Iniciar barra de progreso DESPUÉS de los workers
+        barra_thread = threading.Thread(target=mostrar_barra_progreso, daemon=True)
+        barra_thread.start()
+        # Esperar finalización con timeout agresivo
+        start_wait = time.time()
+        max_wait_time = 300  # 5 minutos máximo
 
-        # Esperar a que terminen todos los trabajos o se detecte una interrupción
         while not stop_event.is_set() and not success_flag.is_set():
-            try:
-                # Verificar si todos los threads han terminado
-                all_done = all(not t.is_alive() for t in threads)
-                if all_done or combo_queue.empty():
-                    break
-                time.sleep(0.1)
-            except KeyboardInterrupt:
+            # Verificar si todos los threads terminaron naturalmente
+            all_done = all(not t.is_alive() for t in threads)
+            
+            # Verificar si la cola está vacía
+            queue_empty = combo_queue.empty()
+            
+            # Verificar timeout general
+            elapsed = time.time() - start_wait
+            
+            if all_done or queue_empty or elapsed > max_wait_time:
                 break
                 
+            time.sleep(0.5)
+        
+        # Esperar threads con timeout corto
+        wait_for_threads(threads, timeout=2)
     except KeyboardInterrupt:
-        print(f"\n{YELLOW}[!] Detectado Ctrl+C...{RESET}")
+        print(f"\n{YELLOW}[!]  Ctrl+C Detected...{RESET}")
+        stop_event.set()
     finally:
+        stop_event.set()
         cleanup_and_exit(threads, start_time)
-        sys.exit(0)
+        os._exit(0)  # Salida forzada inmediata
 
 if __name__ == "__main__":
    main()
