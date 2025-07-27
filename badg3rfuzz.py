@@ -759,8 +759,13 @@ def main():
         print(f"[>] {len(proxies_list)} proxies loaded")
     else:
         print("[>] No proxies setup - Direct connection")
-
-    log_filename = f"fuzzlog-{datetime.now().strftime('%d-%m-%Y_%H-%M-%S')}.log"
+    #script real location
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    # full path to logs folder
+    logs_dir = os.path.join(script_dir, "logs")
+    #create log dir
+    os.makedirs("logs", exist_ok=True)
+    log_filename = os.path.join(logs_dir, f"fuzzlog-{datetime.now().strftime('%d-%m-%Y_%H-%M-%S')}.log")
 
     start_time = datetime.now()
     print(f"[>] Ready to fuzz and bruteforce your targets! 🦡💥")
