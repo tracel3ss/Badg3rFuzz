@@ -11,6 +11,7 @@ import sys
 import queue
 import signal
 import subprocess
+import tempfile
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options as ChromeOptions
 from selenium.webdriver.chrome.service import Service as ChromeService
@@ -99,6 +100,69 @@ def signal_handler(signum, frame):
             combo_queue.task_done()
     except queue.Empty:
         pass
+
+def convert_der_to_pem_if_needed(cert_path):
+    """
+    Convierte certificado DER a PEM si es necesario y retorna la ruta del archivo PEM
+    """
+    if not cert_path or not os.path.exists(cert_path):
+        return cert_path
+    
+    try:
+        # Intentar leer como PEM primero
+        with open(cert_path, 'rb') as f:
+            cert_data = f.read()
+        
+        # Verificar si ya es PEM
+        if b'-----BEGIN CERTIFICATE-----' in cert_data:
+            return cert_path
+        
+        # Crear archivo temporal para PEM
+        temp_fd, temp_pem_path = tempfile.mkstemp(suffix='.pem', prefix='badg3r_cert_')
+        os.close(temp_fd)
+
+        # Intentar conversión con OpenSSL
+        try:
+            # Comando OpenSSL para convertir DER a PEM
+            cmd = [
+                'openssl', 'x509', 
+                '-inform', 'DER', 
+                '-in', cert_path, 
+                '-out', temp_pem_path, 
+                '-outform', 'PEM'
+            ]
+            
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=10)
+            if result.returncode == 0:
+                print(f"{GREEN}[i] Converted DER to PEM successfully: {temp_pem_path}{RESET}")
+                return temp_pem_path
+            else:
+                print(f"{RED}[!] OpenSSL conversion failed: {result.stderr.strip()}{RESET}")
+                try:
+                    os.remove(temp_pem_path)
+                except:
+                    pass
+                return None
+        except FileNotFoundError:
+            print(f"{RED}[!] OpenSSL not found in system PATH{RESET}")
+            print(f"{YELLOW}[!] Please install OpenSSL or convert certificate manually:{RESET}")
+            print(f"{YELLOW}    openssl x509 -inform DER -in {cert_path} -out {cert_path}.pem{RESET}")
+            try:
+                os.remove(temp_pem_path)
+            except:
+                pass
+            return None
+        except subprocess.TimeoutExpired:
+            print(f"{RED}[!] OpenSSL conversion timeout{RESET}")
+            try:
+                os.remove(temp_pem_path)
+            except:
+                pass
+            return None  
+    except Exception as e:
+        print(f"{RED}[!] Error reading certificate file: {e}{RESET}")
+        return None
+
 def generar_token_y_cookie(site_key, captcha_action, login_url, webdriver_type="firefox", verbose=False):
     if stop_event.is_set() or success_flag.is_set():
         raise Exception("Operation cancelled by user")
@@ -379,7 +443,8 @@ def check_success(response, success_indicators, fail_indicators, success_codes, 
     return False, f"No success indicators found (HTTP: {response.status_code})"
 
 def login_attempt(username, password, site_key, captcha_action, login_url, post_url, origin_url=None, 
-                  webdriver_type="firefox", verbose=False, user_agent=None, proxy=None, proxy_timeout=20):
+                  webdriver_type="firefox", verbose=False, user_agent=None, proxy=None, proxy_timeout=20,
+                  disable_ssl_verify=False, ca_cert_path=None):
     # Verificar si debemos parar antes de crear WebDriver
     if stop_event.is_set() or success_flag.is_set():
         raise Exception("Operation cancelled")    
@@ -401,6 +466,26 @@ def login_attempt(username, password, site_key, captcha_action, login_url, post_
 
     with requests.Session() as s:
         s.cookies.update(cookies)
+        
+        # Configurar SSL
+        if disable_ssl_verify:
+            s.verify = False
+            # Suprimir warnings de SSL
+            import urllib3
+            urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+        elif ca_cert_path and os.path.exists(ca_cert_path):
+            pem_cert_path = convert_der_to_pem_if_needed(ca_cert_path)
+            if pem_cert_path and os.path.exists(pem_cert_path):
+                s.verify = pem_cert_path
+                if verbose:
+                    with print_lock:
+                        print(f"\r{' ' * 80}\r", end='')
+                        print(f"[i] Using CA cert: {pem_cert_path}")
+            else:
+                with print_lock:
+                    print(f"\r{' ' * 80}\r", end='')
+                    print(f"{RED}[!] Could not process certificate file: {ca_cert_path}{RESET}")
+                    print(f"{YELLOW}[!] Falling back to default SSL verification{RESET}")
         
         # Configurar proxy si se proporciona
         if proxy:
@@ -428,7 +513,7 @@ def login_attempt(username, password, site_key, captcha_action, login_url, post_
 
 def worker(site_key, captcha_action, login_url, post_url, origin_url, stop_on_success, log_filename, 
           webdriver_type, verbose, success_indicators, fail_indicators, success_codes, check_cookies, 
-          delay, jitter, user_agents_file, proxies_list, proxy_timeout):    
+          delay, jitter, user_agents_file, proxies_list, proxy_timeout, disable_ssl_verify, ca_cert_path):
     global attempts_done
     thread_id = threading.current_thread().ident
     user_agents = cargar_user_agents(user_agents_file)
@@ -456,7 +541,8 @@ def worker(site_key, captcha_action, login_url, post_url, origin_url, stop_on_su
         try:
             # Verificar eventos antes de intentar login
             response = login_attempt(username, password, site_key, captcha_action, login_url, post_url, origin_url, 
-                                     webdriver_type, verbose, current_ua, current_proxy, proxy_timeout)
+                         webdriver_type, verbose, current_ua, current_proxy, proxy_timeout,
+                         disable_ssl_verify, ca_cert_path)
             # Rotar proxy si hay múltiples
             if proxies_list and len(proxies_list) > 1:
                 proxy_index += 1
@@ -611,15 +697,14 @@ def force_kill_drivers():
             driver.quit()
         except:
             pass
-    
-    # Matar procesos restantes de Firefox/Chrome (Windows)
-    if sys.platform == "win32":
+
+def cleanup_temp_certs():
+    """Limpiar certificados temporales creados durante la ejecución"""
+    import glob
+    temp_certs = glob.glob('/tmp/badg3r_cert_*.pem') + glob.glob(os.path.join(tempfile.gettempdir(), 'badg3r_cert_*.pem'))
+    for cert_file in temp_certs:
         try:
-            import subprocess
-            subprocess.run(['taskkill', '/f', '/im', 'geckodriver.exe'], 
-                          stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-            subprocess.run(['taskkill', '/f', '/im', 'chromedriver.exe'], 
-                          stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            os.remove(cert_file)
         except:
             pass
 
@@ -652,6 +737,8 @@ def main():
     parser.add_argument("--proxy", help="Proxy único formato http://user:pass@host:port o http://host:port")
     parser.add_argument("--proxy-file", help="Archivo con lista de proxies (uno por línea)")
     parser.add_argument("--proxy-timeout", type=int, default=20, help="Timeout para conexiones proxy en segundos")
+    parser.add_argument("--disable-ssl-verify", action="store_true", help="Disable SSL certificate verification")
+    parser.add_argument("--ca-cert", help="Path to CA certificate file to add to trust chain")
     args = parser.parse_args()
     if args.no_banner == False:
         print_banner()
@@ -707,7 +794,9 @@ def main():
                 args.jitter,
                 args.user_agents_file,
                 proxies_list,
-                args.proxy_timeout
+                args.proxy_timeout,
+                args.disable_ssl_verify,
+                args.ca_cert
             ))
             t.daemon = False
             threads.append(t)
@@ -750,6 +839,7 @@ def main():
     finally:
         stop_event.set()
         cleanup_and_exit(threads, start_time)
+        cleanup_temp_certs()
         os._exit(0)  # Salida forzada inmediata
 
 if __name__ == "__main__":
