@@ -1,0 +1,8 @@
+skips: 
+  - B101  # Skip assert_used test
+  - B601  # Skip shell injection (controlled usage)
+  - B602  # Skip subprocess_popen_with_shell_equals_true
+exclude_dirs:
+  - tests
+  - venv
+  - .venv

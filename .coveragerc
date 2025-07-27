@@ -1,0 +1,28 @@
+[run]
+source = .
+omit = 
+    tests/*
+    venv/*
+    .venv/*
+    setup.py
+    */site-packages/*
+    __pycache__/*
+    .pytest_cache/*
+    build/*
+    dist/*
+
+[report]
+exclude_lines =
+    pragma: no cover
+    def __repr__
+    if self.debug:
+    if settings.DEBUG
+    raise AssertionError
+    raise NotImplementedError
+    if 0:
+    if __name__ == .__main__.:
+    pass
+    except ImportError:
+
+[html]
+directory = htmlcov

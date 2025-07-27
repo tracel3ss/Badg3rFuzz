@@ -1,0 +1,14 @@
+# .github/CODEOWNERS - Propietarios del código
+# Global owners
+* @security-team @lead-developer
+
+# Security-related files
+/scripts/security-check.sh @security-team
+/.github/workflows/ @devops-team @security-team
+/tests/security/ @security-team
+bandit.yml @security-team
+requirements*.txt @security-team
+
+# Core application
+badg3rfuzz.py @lead-developer @security-team
+/tests/ @qa-team @lead-developer

@@ -1,0 +1,52 @@
+# .github/ISSUE_TEMPLATE/security_report.yml - Template para reportes de seguridad
+name: Security Report
+description: Report a security vulnerability (use private channels for critical issues)
+title: "[SECURITY] "
+labels: ["security", "high-priority"]
+assignees:
+  - security-team
+
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ⚠️ **IMPORTANT**: For critical security vulnerabilities, please use our private security contact instead of this public issue.
+        
+        Email: security@company.com
+        
+        This form is for non-critical security improvements and observations.
+
+  - type: dropdown
+    id: severity
+    attributes:
+      label: Severity Level
+      description: How severe is this security issue?
+      options:
+        - Low (Security improvement suggestion)
+        - Medium (Potential security concern)
+        - High (Please use private channel)
+    validations:
+      required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Security Issue Description
+      description: Describe the security concern (avoid sensitive details)
+      placeholder: "General description of the security observation..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: impact
+    attributes:
+      label: Potential Impact
+      description: What could be the impact of this issue?
+    validations:
+      required: true
+
+  - type: textarea
+    id: mitigation
+    attributes:
+      label: Suggested Mitigation
+      description: Do you have suggestions for addressing this?

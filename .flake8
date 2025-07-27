@@ -1,0 +1,25 @@
+[flake8]
+max-line-length = 120
+max-complexity = 12
+exclude = 
+    .git,
+    __pycache__,
+    .venv,
+    venv,
+    .pytest_cache,
+    build,
+    dist,
+    *.egg-info
+extend-ignore = 
+    E203,  # whitespace before ':'
+    W503,  # line break before binary operator
+    E501,  # line too long (handled by max-line-length)
+per-file-ignores =
+    tests/*:S101,S106,S108  # Allow assert statements in tests
+select = 
+    E,     # pycodestyle errors
+    W,     # pycodestyle warnings
+    F,     # pyflakes
+    C,     # mccabe complexity
+    B,     # flake8-bugbear
+    S,     # flake8-bandit security

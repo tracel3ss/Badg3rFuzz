@@ -1,0 +1,88 @@
+# .github/ISSUE_TEMPLATE/bug_report.yml - Template para reportes de bug
+name: Bug Report
+description: Report a bug in Badg3rFuzz
+title: "[BUG] "
+labels: ["bug", "needs-triage"]
+assignees:
+  - lead-developer
+
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to fill out this bug report!
+        **Please note**: This is a security tool. Do not include sensitive information.
+
+  - type: input
+    id: version
+    attributes:
+      label: Badg3rFuzz Version
+      description: What version of Badg3rFuzz are you using?
+      placeholder: "v1.0.0"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: environment
+    attributes:
+      label: Environment
+      description: What environment are you running in?
+      options:
+        - Linux
+        - macOS
+        - Windows
+        - Docker
+        - CI/CD Pipeline
+    validations:
+      required: true
+
+  - type: dropdown
+    id: browser
+    attributes:
+      label: Browser
+      description: Which browser are you using?
+      options:
+        - Firefox
+        - Chrome
+        - Both
+    validations:
+      required: true
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: Describe the bug and what you expected to happen
+      placeholder: "When running badg3rfuzz with..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps to Reproduce
+      description: How can we reproduce this issue?
+      placeholder: |
+        1. Run command: python badg3rfuzz.py --args...
+        2. Expected behavior: ...
+        3. Actual behavior: ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant logs
+      description: Please copy and paste any relevant log output (remove sensitive info)
+      render: shell
+
+  - type: checkboxes
+    id: terms
+    attributes:
+      label: Security Checklist
+      description: Please confirm the following
+      options:
+        - label: I have removed any sensitive information from this report
+          required: true
+        - label: This bug report does not contain credentials or private data
+          required: true

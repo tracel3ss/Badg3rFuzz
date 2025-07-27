@@ -600,6 +600,49 @@ python badg3rfuzz.py \
 
 ---
 
+## 🧪 Development
+
+### Testing
+```bash
+# Run all tests
+make test
+
+# Run specific test types
+make test-unit
+make test-integration
+make test-security
+make test-performance
+```
+
+### Security Checks
+```bash
+# Full security audit
+make security-check
+
+# Individual security tools
+make bandit
+make safety
+```
+
+### Code Quality
+```bash
+make lint
+make format
+make pre-commit
+```
+
+## 📊 CI/CD Integration
+
+This project includes comprehensive GitHub Actions workflows:
+
+- **Static Analysis**: Flake8, Bandit, Safety checks
+- **Multi-platform Testing**: Linux, macOS, Windows
+- **Security Testing**: Automated vulnerability scanning
+- **Performance Testing**: Benchmark tests
+- **Docker Support**: Containerized testing and deployment
+
+---
+
 ## ⚖️ Legal and Ethical Guidelines
 
 ### Authorization Requirements
