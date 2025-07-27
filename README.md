@@ -710,12 +710,16 @@ consequences resulting from unauthorized use of this tool.
 - **Issues**: [GitHub Issues](https://github.com/tracel3ss/badg3rfuzz/issues)
 - **Discussions**: [GitHub Discussions](https://github.com/tracel3ss/badg3rfuzz/discussions)
 
-### Contributing
+### 🤝 Contributing
 Contributions welcome! Please:
+
 1. Fork the repository
-2. Create a feature branch
-3. Submit a pull request with tests
-4. Follow coding standards
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)
+3. Run security checks (`make security-check`)
+4. Run tests (`make test`)
+5. Commit changes (`git commit -m 'Add amazing feature'`)
+6. Push to branch (`git push origin feature/amazing-feature`)
+7. Open a Pull Request
 
 ### Professional Services
 For professional security assessments and custom tool development, contact the author.
@@ -759,4 +763,4 @@ pip install -r requirements.txt
 
 **Badg3rFuzz v1.0** - Professional cybersecurity auditing made efficient 🦡💥
 
-*Developed by cybersecurity professionals, for cybersecurity professionals.*
+*Developed by professionals, for professionals.*
