@@ -102,15 +102,21 @@ jobs:
     - name: Install Python dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install pytest pytest-cov pytest-mock requests-mock
+        pip install -e .[dev,test]
         if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
     
-    - name: Download WebDrivers (GeckoDriver)
+    - name: Get latest Geckodriver version
+      id: geckodriver-version
       run: |
-        # Firefox
-        wget https://github.com/mozilla/geckodriver/releases/latest/download/geckodriver-linux64.tar.gz
+        LATEST=$(curl -s https://api.github.com/repos/mozilla/geckodriver/releases/latest | jq -r .tag_name)
+        echo "GECKODRIVER_VERSION=$LATEST" >> $GITHUB_ENV
+
+    - name: Download Geckodriver ${{ env.GECKODRIVER_VERSION }}
+      run: |
+        wget -O geckodriver.tar.gz https://github.com/mozilla/geckodriver/releases/download/${{ env.GECKODRIVER_VERSION }}/geckodriver-${{ env.GECKODRIVER_VERSION }}-linux64.tar.gz
         tar -xzf geckodriver.tar.gz
         chmod +x geckodriver
+        sudo mv geckodriver /usr/local/bin/
 
     - name: Install Chrome
       uses: browser-actions/setup-chrome@v1
@@ -180,7 +186,7 @@ jobs:
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install pytest requests-mock
+        pip install -e .[dev,test]
         if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
         sudo apt-get update && sudo apt-get install -y firefox xvfb
     
@@ -219,7 +225,7 @@ jobs:
     - name: Install security testing tools
       run: |
         python -m pip install --upgrade pip
-        pip install semgrep pytest
+        pip install -e .[dev,test]
         if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
     
     - name: Run Semgrep security scan
@@ -256,7 +262,7 @@ jobs:
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install pytest pytest-benchmark memory-profiler
+        pip install -e .[dev,test]
         if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
     
     - name: Run performance benchmarks
