@@ -60,3 +60,12 @@ def mock_response():
         mock_resp.token = "test_token_123"
         return mock_resp
     return _mock_response
+
+def pytest_addoption(parser):
+    parser.addoption(
+        "--browser", action="store", default="chrome", help="Browser to use for Selenium tests"
+    )
+
+@pytest.fixture
+def browser(request):
+    return request.config.getoption("--browser")
