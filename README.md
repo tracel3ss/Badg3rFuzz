@@ -664,9 +664,8 @@ consequences resulting from unauthorized use of this tool.
 ## 📞 Support and Community
 
 ### Getting Help
-- **Issues**: [GitHub Issues](https://github.com/yourusername/badg3rfuzz/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/yourusername/badg3rfuzz/discussions)
-- **Security**: Email security@yourcompany.com for security-related issues
+- **Issues**: [GitHub Issues](https://github.com/tracel3ss/badg3rfuzz/issues)
+- **Discussions**: [GitHub Discussions](https://github.com/tracel3ss/badg3rfuzz/discussions)
 
 ### Contributing
 Contributions welcome! Please:
