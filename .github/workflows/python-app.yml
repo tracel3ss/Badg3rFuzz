@@ -132,7 +132,7 @@ jobs:
         CHROMEDRIVER_PATH: ./chromedriver
     
     - name: Upload coverage reports
-      uses: codecov/codecov-action@v3
+      uses: codecov/codecov-action@v5
       if: matrix.python-version == '3.10' && matrix.browser == 'firefox'
       with:
         file: ./coverage.xml
