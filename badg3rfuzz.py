@@ -680,7 +680,6 @@ def wait_for_threads(threads, timeout=3):
 
 def force_kill_drivers():
     """Fuerza el cierre de todos los drivers activos"""
-    global active_drivers
     
     with drivers_lock:
         drivers_to_kill = active_drivers.copy()
