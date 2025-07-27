@@ -105,18 +105,35 @@ jobs:
         pip install pytest pytest-cov pytest-mock requests-mock
         if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
     
-    - name: Download WebDrivers
+    - name: Download WebDrivers (GeckoDriver)
       run: |
         # Firefox
-        wget -O geckodriver.tar.gz https://github.com/mozilla/geckodriver/releases/latest/download/geckodriver-v0.33.0-linux64.tar.gz
+        wget https://github.com/mozilla/geckodriver/releases/latest/download/geckodriver-linux64.tar.gz
         tar -xzf geckodriver.tar.gz
         chmod +x geckodriver
+
+    - name: Install Chrome
+      uses: browser-actions/setup-chrome@v1
+
+    - name: Get Chrome version
+      id: get-chrome-version
+      run: |
+        echo "CHROME_VERSION=$(google-chrome --version | grep -oP '\d+\.\d+\.\d+')" >> $GITHUB_ENV
+
+    - name: Get matching ChromeDriver version
+      id: get-chromedriver-version
+      run: |
+        DRIVER_VERSION=$(curl -s "https://googlechromelabs.github.io/chrome-for-testing/last-known-good-versions-with-downloads.json" \
+          | jq -r --arg VERSION "$CHROME_VERSION" '.channels.Stable.version')
+        echo "DRIVER_VERSION=$DRIVER_VERSION" >> $GITHUB_ENV  
         
-        # Chrome
-        wget -O chromedriver.zip https://chromedriver.storage.googleapis.com/114.0.5735.90/chromedriver_linux64.zip
-        unzip chromedriver.zip
-        chmod +x chromedriver
-    
+    - name: Download ChromeDriver
+      run: |
+        wget https://edgedl.me.gvt1.com/edgedl/chrome/chrome-for-testing/${{ env.DRIVER_VERSION }}/linux64/chromedriver-linux64.zip
+        unzip chromedriver-linux64.zip
+        chmod +x chromedriver-linux64/chromedriver
+        sudo mv chromedriver-linux64/chromedriver /usr/local/bin/chromedriver    
+        
     - name: Setup virtual display
       run: |
         Xvfb :99 -screen 0 1024x768x24 > /dev/null 2>&1 &
