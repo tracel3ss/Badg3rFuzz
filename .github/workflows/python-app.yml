@@ -1,0 +1,310 @@
+# Workflow adaptado para herramienta de auditoría de ciberseguridad
+name: Badg3rFuzz Security Testing
+
+on:
+  push:
+    branches: [ "main", "develop" ]
+  pull_request:
+    branches: [ "main" ]
+  # Permite ejecutar manualmente
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  security-events: write  # Para reportes de seguridad
+
+env:
+  PYTHON_VERSION: "3.10"
+  # Variables para testing de seguridad
+  DISPLAY: ":99"
+  MOZ_HEADLESS: "1"
+
+jobs:
+  # Job 1: Análisis estático y linting
+  static-analysis:
+    runs-on: ubuntu-latest
+    name: Static Analysis & Linting
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python ${{ env.PYTHON_VERSION }}
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+        cache: 'pip'
+    
+    - name: Install base dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install flake8 pylint bandit safety
+        if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+    
+    - name: Lint with flake8 (Security focused)
+      run: |
+        # Errores críticos que detienen el build
+        flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+        # Warnings de seguridad y calidad de código
+        flake8 . --count --exit-zero --max-complexity=12 --max-line-length=120 \
+          --extend-ignore=E203,W503 --statistics
+    
+    - name: Security analysis with Bandit
+      run: |
+        bandit -r . -f json -o bandit-report.json || true
+        bandit -r . -f txt
+      continue-on-error: true
+    
+    - name: Check dependencies for vulnerabilities
+      run: |
+        safety check --json --output safety-report.json || true
+        safety check
+      continue-on-error: true
+    
+    - name: Upload security reports
+      uses: actions/upload-artifact@v3
+      if: always()
+      with:
+        name: security-reports
+        path: |
+          bandit-report.json
+          safety-report.json
+
+  # Job 2: Tests unitarios y funcionales
+  unit-tests:
+    runs-on: ubuntu-latest
+    name: Unit & Functional Tests
+    needs: static-analysis
+    
+    strategy:
+      matrix:
+        python-version: ["3.9", "3.10", "3.11"]
+        browser: ["firefox", "chrome"]
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ matrix.python-version }}
+        cache: 'pip'
+    
+    - name: Install system dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y \
+          firefox \
+          chromium-browser \
+          xvfb \
+          openssl \
+          ca-certificates
+    
+    - name: Install Python dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install pytest pytest-cov pytest-mock requests-mock
+        if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+    
+    - name: Download WebDrivers
+      run: |
+        # Firefox
+        wget -O geckodriver.tar.gz https://github.com/mozilla/geckodriver/releases/latest/download/geckodriver-v0.33.0-linux64.tar.gz
+        tar -xzf geckodriver.tar.gz
+        chmod +x geckodriver
+        
+        # Chrome
+        wget -O chromedriver.zip https://chromedriver.storage.googleapis.com/114.0.5735.90/chromedriver_linux64.zip
+        unzip chromedriver.zip
+        chmod +x chromedriver
+    
+    - name: Setup virtual display
+      run: |
+        Xvfb :99 -screen 0 1024x768x24 > /dev/null 2>&1 &
+        sleep 3
+    
+    - name: Run unit tests
+      run: |
+        pytest tests/ -v --cov=. --cov-report=xml --cov-report=html \
+          --browser=${{ matrix.browser }} || true
+      env:
+        BROWSER: ${{ matrix.browser }}
+        GECKODRIVER_PATH: ./geckodriver
+        CHROMEDRIVER_PATH: ./chromedriver
+    
+    - name: Upload coverage reports
+      uses: codecov/codecov-action@v3
+      if: matrix.python-version == '3.10' && matrix.browser == 'firefox'
+      with:
+        file: ./coverage.xml
+        flags: unittests
+
+  # Job 3: Tests de integración con servicios mock
+  integration-tests:
+    runs-on: ubuntu-latest
+    name: Integration Tests
+    needs: unit-tests
+    
+    services:
+      # Mock web server para testing
+      mockserver:
+        image: mockserver/mockserver:5.15.0
+        ports:
+          - 1080:1080
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python ${{ env.PYTHON_VERSION }}
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+        cache: 'pip'
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install pytest requests-mock
+        if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+        sudo apt-get update && sudo apt-get install -y firefox xvfb
+    
+    - name: Setup geckodriver
+      run: |
+        wget -O geckodriver.tar.gz https://github.com/mozilla/geckodriver/releases/latest/download/geckodriver-v0.33.0-linux64.tar.gz
+        tar -xzf geckodriver.tar.gz
+        chmod +x geckodriver
+    
+    - name: Setup virtual display
+      run: |
+        Xvfb :99 -screen 0 1024x768x24 > /dev/null 2>&1 &
+        sleep 3
+    
+    - name: Run integration tests
+      run: |
+        pytest tests/integration/ -v --tb=short
+      env:
+        MOCK_SERVER_URL: http://localhost:1080
+        GECKODRIVER_PATH: ./geckodriver
+
+  # Job 4: Tests de seguridad específicos
+  security-tests:
+    runs-on: ubuntu-latest
+    name: Security Tests
+    needs: static-analysis
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python ${{ env.PYTHON_VERSION }}
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+    
+    - name: Install security testing tools
+      run: |
+        python -m pip install --upgrade pip
+        pip install semgrep pytest
+        if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+    
+    - name: Run Semgrep security scan
+      run: |
+        semgrep --config=auto --json --output=semgrep-report.json . || true
+        semgrep --config=auto .
+      continue-on-error: true
+    
+    - name: Test SSL/TLS handling
+      run: |
+        pytest tests/security/ -v -k "ssl or tls or cert"
+      continue-on-error: true
+    
+    - name: Test proxy functionality
+      run: |
+        pytest tests/security/ -v -k "proxy"
+      continue-on-error: true
+
+  # Job 5: Performance tests
+  performance-tests:
+    runs-on: ubuntu-latest
+    name: Performance Tests
+    needs: unit-tests
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python ${{ env.PYTHON_VERSION }}
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install pytest pytest-benchmark memory-profiler
+        if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+    
+    - name: Run performance benchmarks
+      run: |
+        pytest tests/performance/ -v --benchmark-only --benchmark-json=benchmark.json
+      continue-on-error: true
+
+  # Job 6: Build y empaquetado
+  build-package:
+    runs-on: ubuntu-latest
+    name: Build Package
+    needs: [unit-tests, integration-tests]
+    if: github.event_name == 'push'
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python ${{ env.PYTHON_VERSION }}
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+    
+    - name: Install build dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install build twine wheel
+    
+    - name: Build package
+      run: |
+        python -m build
+    
+    - name: Check package
+      run: |
+        twine check dist/*
+    
+    - name: Upload build artifacts
+      uses: actions/upload-artifact@v3
+      with:
+        name: python-package
+        path: dist/
+
+  # Job 7: Reporte final
+  final-report:
+    runs-on: ubuntu-latest
+    name: Final Security Report
+    needs: [static-analysis, security-tests]
+    if: always()
+    
+    steps:
+    - name: Download security artifacts
+      uses: actions/download-artifact@v3
+      with:
+        name: security-reports
+      continue-on-error: true
+    
+    - name: Generate security summary
+      run: |
+        echo "## 🔒 Security Analysis Summary" >> $GITHUB_STEP_SUMMARY
+        echo "- Static Analysis: ${{ needs.static-analysis.result }}" >> $GITHUB_STEP_SUMMARY
+        echo "- Security Tests: ${{ needs.security-tests.result }}" >> $GITHUB_STEP_SUMMARY
+        
+        if [ -f bandit-report.json ]; then
+          echo "- Bandit scan completed" >> $GITHUB_STEP_SUMMARY
+        fi
+        
+        if [ -f safety-report.json ]; then
+          echo "- Dependency vulnerability scan completed" >> $GITHUB_STEP_SUMMARY
+        fi
