@@ -11,15 +11,15 @@ exclude =
     dist,
     *.egg-info
 extend-ignore = 
-    E203,  # whitespace before ':'
-    W503,  # line break before binary operator
-    E501,  # line too long (handled by max-line-length)
+    E203,  
+    W503, 
+    E501,  
 per-file-ignores =
-    tests/*:S101,S106,S108  # Allow assert statements in tests
+    tests/*:S101,S106,S108 
 select = 
-    E,     # pycodestyle errors
-    W,     # pycodestyle warnings
-    F,     # pyflakes
-    C,     # mccabe complexity
-    B,     # flake8-bugbear
-    S,     # flake8-bandit security
+    E,    
+    W,    
+    F,   
+    C,    
+    B,    
+    S,     
