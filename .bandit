@@ -1,4 +1,5 @@
 # .bandit
+[bandit]
 exclude_dirs:
   - tests
   - htmlcov
