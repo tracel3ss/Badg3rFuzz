@@ -1,10 +1,14 @@
 # tests/integration/test_token_cookie_generation.py
 import pytest
 from unittest.mock import patch, MagicMock
-from badg3rfuzz import generar_token_y_cookie
+from badg3rfuzz import generar_token_y_cookie, stop_event, success_flag
 
 @pytest.mark.integration
 def test_generar_token_y_cookie_mocked():
+    # Limpiar eventos para que no lancen excepción
+    stop_event.clear()
+    success_flag.clear()
+
     mock_driver = MagicMock()
     mock_driver.execute_script.return_value = "mocked_token"
     mock_driver.get_cookies.return_value = [{"name": "sessionid", "value": "abc123"}]
