@@ -1,6 +1,7 @@
 # tests/integration/test_check_success_integration.py
 import pytest
 from requests.models import Response
+from unittest.mock import patch, Mock, mock_open
 from badg3rfuzz import check_success, login_attempt
 
 @pytest.mark.integration
@@ -55,7 +56,7 @@ def mock_webdriver(monkeypatch):
     monkeypatch.setattr("selenium.webdriver.Firefox", lambda *a, **k: mock_driver)
     monkeypatch.setattr("selenium.webdriver.Chrome", lambda *a, **k: mock_driver)
     yield mock_driver
-    
+
 @pytest.mark.parametrize("webdriver_type", ["firefox", "chrome"])
 def test_integration_login_attempt_and_check_success():
     response = login_attempt(
