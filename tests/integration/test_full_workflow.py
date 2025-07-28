@@ -2,8 +2,10 @@
 import threading
 import queue
 import pytest
-from unittest.mock import patch, Mock
-from badg3rfuzz import worker, check_success
+from unittest.mock import patch, Mock, MagicMock
+from badg3rfuzz import worker, check_success, generar_token_y_cookie
+from requests.models import Response
+
 
 # Global flags que necesita el worker
 import badg3rfuzz
@@ -65,3 +67,50 @@ def test_complete_bruteforce_workflow(tmp_path):
         log = f.read()
         assert "SUCCESS: admin:123456" in log
         assert "FAIL: user:wrongpass" not in log or "user:wrongpass" in log
+
+@pytest.mark.integration
+@pytest.mark.parametrize("text,cookies,status_code,expected_success", [
+    ("Bienvenido, admin!", {"sessionid": "xyz"}, 200, True),
+    ("Invalid login", {}, 401, False),
+    ("<html><script>window.location = '/dashboard';</script></html>", {}, 302, True),
+    ("", {"auth_token": "abc123"}, 200, True),
+    ('{"Result": false, "Msg": "Credenciales incorrectas"}', {}, 200, False),
+    ('{"Result": true}', {}, 200, True),
+    ("", {}, 302, True),  # Redirección con status_code en success_codes
+])
+def test_check_success_behavior(text, cookies, status_code, expected_success):
+    res = Response()
+    res.status_code = status_code
+    res._content = text.encode("utf-8")
+    res.cookies = cookies
+
+    success, reason = check_success(
+        response=res,
+        success_indicators=["bienvenido", "dashboard", "éxito"],
+        fail_indicators=["invalid", "incorrectas"],
+        success_codes=[200, 302],
+        check_cookies=True,
+        verbose=True
+    )
+    assert success == expected_success, f"Reason: {reason}"
+
+@pytest.mark.integration
+def test_generar_token_y_cookie_mocked():
+    mock_driver = MagicMock()
+    mock_driver.execute_script.return_value = "mocked_token"
+    mock_driver.get_cookies.return_value = [{"name": "sessionid", "value": "abc123"}]
+
+    with patch("badg3rfuzz.webdriver.Firefox", return_value=mock_driver), \
+         patch("badg3rfuzz.FirefoxService") as mock_service:
+        
+        token, cookies = generar_token_y_cookie(
+            site_key="dummy_sitekey",
+            captcha_action="login",
+            login_url="http://test/login",
+            webdriver_type="firefox",
+            verbose=False
+        )
+
+    assert token == "mocked_token"
+    assert isinstance(cookies, dict)
+    assert cookies.get("sessionid") == "abc123"
