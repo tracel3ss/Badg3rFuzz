@@ -1,12 +1,11 @@
 # tests/integration/test_token_cookie_generation.py
 import pytest
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch, MagicMock, Mock, mock_open
 from badg3rfuzz import generar_token_y_cookie, stop_event, success_flag
 
 @pytest.mark.integration
 def test_generar_token_y_cookie_mocked():
- """Test completo para generar_token_y_cookie con mocking total"""
-    
+    """Test completo para generar_token_y_cookie con mocking total"""
     # Mock completo del webdriver y dependencias
     mock_driver = Mock()
     mock_driver.get_cookies.return_value = [

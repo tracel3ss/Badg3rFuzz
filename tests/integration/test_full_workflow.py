@@ -137,10 +137,10 @@ def test_check_success_extended(text, cookies, status_code, history, expected_su
     
     assert success == expected_success
     # Verificar que la razón contiene alguna palabra clave esperada
-    if expected_reason == "Redirect URL detected":
+    if expected_success == "Redirect URL detected":
         # Para este caso específico, verificamos que detecte el patrón de éxito
         assert any(keyword in reason.lower() for keyword in ["success", "dashboard", "welcome"])
-    elif "redirect" in expected_reason.lower():
+    elif "redirect" in expected_success.lower():
         assert "redirect" in reason.lower() or "dashboard" in reason.lower()
-    elif "cookie" in expected_reason.lower():
+    elif "cookie" in expected_success.lower():
         assert "cookie" in reason.lower()

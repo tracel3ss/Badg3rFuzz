@@ -1,6 +1,6 @@
 import pytest
 import sys
-from unittest.mock import patch
+from unittest.mock import patch, Mock, mock_open
 from badg3rfuzz import main
 
 @pytest.mark.integration
