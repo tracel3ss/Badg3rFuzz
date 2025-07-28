@@ -89,3 +89,7 @@ Thumbs.db
 *.exe
 *.zip
 cacert
+
+__pycache__/
+pip-wheel-metadata/
+.mypy_cache/

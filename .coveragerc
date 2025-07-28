@@ -2,8 +2,13 @@
 source = .
 omit = 
     tests/*
+    */tests/*
+    */test_*.py
     venv/*
     .venv/*
+    htmlcov/*
+    logs/*
+    .benchmarks/*
     setup.py
     */site-packages/*
     __pycache__/*
@@ -15,14 +20,15 @@ omit =
 exclude_lines =
     pragma: no cover
     def __repr__
-    if self.debug:
+    if self.debug
     if settings.DEBUG
     raise AssertionError
     raise NotImplementedError
     if 0:
-    if __name__ == .__main__.:
+    if __name__ == "__main__":
     pass
-    except ImportError:
+    except ImportError
+    if typing.TYPE_CHECKING:
 
 [html]
 directory = htmlcov

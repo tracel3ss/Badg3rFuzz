@@ -6,3 +6,9 @@ exclude_dirs:
   - tests
   - venv
   - .venv
+  - tests
+  - .github
+  - htmlcov
+  - logs
+  - .benchmarks
+  - cacert
