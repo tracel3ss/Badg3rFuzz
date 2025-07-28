@@ -101,6 +101,17 @@ def signal_handler(signum, frame):
     except queue.Empty:
         pass
 
+def safe_print_lock(*args, **kwargs):
+    print_lock.acquire()
+    try:
+        # Borrar línea anterior si se desea
+        if kwargs.pop("_clear_line", False):
+            print("\r" + " " * 120 + "\r", end='')
+            #print(f"\r{' ' * 80}\r", end='')
+        print(*args, **kwargs)
+    finally:
+        print_lock.release()
+
 def convert_der_to_pem_if_needed(cert_path):
     if not cert_path or not os.path.exists(cert_path):
         return cert_path
@@ -161,9 +172,7 @@ def generar_token_y_cookie(site_key, captcha_action, login_url, webdriver_type="
     if stop_event.is_set() or success_flag.is_set():
         raise Exception("Operation cancelled by user")
     if verbose:
-        with print_lock:
-            print(f"\r{' ' * 80}\r", end='')
-            print(f"[i] Init WebDriver: {webdriver_type}")
+        safe_print_lock(f"[i] Init WebDriver: {webdriver_type}")
 
     driver = None
     try:
@@ -253,9 +262,7 @@ def generar_token_y_cookie(site_key, captcha_action, login_url, webdriver_type="
             )
         except:
             if verbose:
-                with print_lock:
-                    print(f"\r{' ' * 80}\r", end='')
-                    print("[!] Captcha Timeout")
+                safe_print_lock("[!] Captcha Timeout", _clear_line=True)
             pass
 
         token = driver.execute_script(f"""
@@ -319,9 +326,7 @@ def cargar_proxies(proxy_file=None, single_proxy=None):
         if '://' in proxy:  # Formato básico http://... o socks://...
             valid_proxies.append(proxy)
         else:
-            with print_lock:
-                print(f"\r{' ' * 80}\r", end='')
-                print(f"{YELLOW}[!] Ignoring Proxy with invalid format: {proxy}{RESET}")
+            safe_print_lock(f"{YELLOW}[!] Ignoring Proxy with invalid format: {proxy}{RESET}")
     
     return valid_proxies
 
@@ -377,16 +382,14 @@ def check_success(response, success_indicators, fail_indicators, success_codes, 
     for fail_pattern in fail_indicators:
         if fail_pattern.lower() in response_text:
             if verbose:
-                with print_lock:
-                    print(f"[DEBUG] Fail pattern found: {fail_pattern}")
+                safe_print_lock(f"[DEBUG] Fail pattern found: {fail_pattern}", _clear_line=True)
             return False, f"Fail pattern detected: {fail_pattern}"
     
     # Capa 2: Análisis de contenido - Patrones de ÉXITO (alta prioridad)
     for success_pattern in success_indicators:
         if success_pattern.lower() in response_text:
             if verbose:
-                with print_lock:
-                    print(f"[DEBUG] Success pattern found: {success_pattern}")
+                safe_print_lock(f"[DEBUG] Success pattern found: {success_pattern}", _clear_line=True)
             return True, f"Success pattern detected: {success_pattern}"
     
     # Capa 3: Verificar redirecciones exitosas
@@ -397,8 +400,7 @@ def check_success(response, success_indicators, fail_indicators, success_codes, 
         for pattern in success_redirect_patterns:
             if pattern in redirect_url:
                 if verbose:
-                    with print_lock:
-                        print(f"[DEBUG] Success redirect detected: {redirect_url}")
+                    safe_print_lock(f"[DEBUG] Success redirect detected: {redirect_url}", _clear_line=True)
                 return True, f"Success redirect to: {pattern}"
     
     # Capa 4: Verificar cookies de sesión
@@ -410,8 +412,7 @@ def check_success(response, success_indicators, fail_indicators, success_codes, 
             for pattern in session_cookie_patterns:
                 if pattern in cookie_name_lower:
                     if verbose:
-                        with print_lock:
-                            print(f"[DEBUG] Session cookie detected: {cookie_name}")
+                        safe_print_lock(f"[DEBUG] Session cookie detected: {cookie_name}", _clear_line=True)
                     return True, f"Session cookie set: {cookie_name}"
     
     # Capa 5: Análisis JSON (compatibilidad con código existente)
@@ -429,8 +430,7 @@ def check_success(response, success_indicators, fail_indicators, success_codes, 
     # Capa 6: Códigos HTTP como indicador COMPLEMENTARIO (baja prioridad)
     if response.status_code in success_codes and response.status_code != 200:
         if verbose:
-            with print_lock:
-                print(f"[DEBUG] Success HTTP code detected: {response.status_code}")
+            safe_print_lock(f"[DEBUG] Success HTTP code detected: {response.status_code}", _clear_line=True)
         return True, f"Success HTTP code: {response.status_code}"
     
     # Si llegamos aquí, asumimos fallo por defecto
@@ -472,14 +472,10 @@ def login_attempt(username, password, site_key, captcha_action, login_url, post_
             if pem_cert_path and os.path.exists(pem_cert_path):
                 s.verify = pem_cert_path
                 if verbose:
-                    with print_lock:
-                        print(f"\r{' ' * 80}\r", end='')
-                        print(f"[i] Using CA cert: {pem_cert_path}")
+                    safe_print_lock(f"[i] Using CA cert: {pem_cert_path}")
             else:
-                with print_lock:
-                    print(f"\r{' ' * 80}\r", end='')
-                    print(f"{RED}[!] Could not process certificate file: {ca_cert_path}{RESET}")
-                    print(f"{YELLOW}[!] Falling back to default SSL verification{RESET}")
+                safe_print_lock(f"{RED}[!] Could not process certificate file: {ca_cert_path}{RESET}")
+                safe_print_lock(f"{YELLOW}[!] Falling back to default SSL verification{RESET}")
         
         # Configurar proxy si se proporciona
         if proxy:
@@ -547,13 +543,11 @@ def worker(site_key, captcha_action, login_url, post_url, origin_url, stop_on_su
                 if jitter > 0:
                     sleep_time += random.uniform(0, jitter)
                 time.sleep(sleep_time) 
-            with print_lock:
-                print(f"\r{' ' * 80}\r", end='')
-                if verbose:
-                    print(f"[+] Login:password attempt : {username}:{password}")
-                    print(f"[+] Server Response : HTTP Code {response.status_code}> {response.json()}")
-                else:
-                    print(f"[+] Attempt: {username}:{password}")
+            if verbose:
+                safe_print_lock(f"[+] Login:password attempt : {username}:{password}", _clear_line=True)
+                safe_print_lock(f"[+] Server Response : HTTP Code {response.status_code}> {response.json()}", _clear_line=True)
+            else:
+                safe_print_lock(f"[+] Attempt: {username}:{password}", _clear_line=True)
 
                 success, error_msg = check_success(
                     response, 
@@ -582,13 +576,10 @@ def worker(site_key, captcha_action, login_url, post_url, origin_url, stop_on_su
                         
         except Exception as e:
             if not stop_event.is_set():
-                with print_lock:
-                    if "proxy" in str(e).lower():
-                        print(f"\r{' ' * 80}\r", end='')
-                        print(f"{RED}[!] Proxy Error with {username}:{password}: {e}{RESET}")
-                    else:
-                        print(f"\r{' ' * 80}\r", end='')
-                        print(f"{RED}[!] Error with {username}:{password}: {e}{RESET}")
+                if "proxy" in str(e).lower():
+                    safe_print_lock(f"{RED}[!] Proxy Error with {username}:{password}: {e}{RESET}", _clear_line=True)
+                else:
+                    safe_print_lock(f"{RED}[!] Error with {username}:{password}: {e}{RESET}", _clear_line=True)
         finally:
             # Actualizar contador y marcar tarea como completada
             with attempts_lock:
@@ -625,14 +616,12 @@ def mostrar_barra_progreso():
         filled_length = int(bar_length * attempts_done // total_attempts) if total_attempts else 0
         bar = '=' * filled_length + '-' * (bar_length - filled_length)
 
-        with print_lock:
-            print(f"\r{CYAN}[{bar}] {attempts_done}/{total_attempts} ({percent:.2f}%) | ETA: {eta:.1f}s{RESET}", end='', flush=True)
+        safe_print_lock(f"\r{CYAN}[{bar}] {attempts_done}/{total_attempts} ({percent:.2f}%) | ETA: {eta:.1f}s{RESET}", end='', flush=True)
 
         time.sleep(0.2)
 
     # Imprime línea final al terminar
-    with print_lock:
-        print()
+    safe_print_lock()
 
 def preparar_combos(username_file, password_file, user_fuzzer):
     if username_file and os.path.exists(username_file):
