@@ -283,7 +283,7 @@ jobs:
     
     - name: Run integration tests
       run: |
-        pytest tests/integration/ --cov=badg3rfuzz --cov-report=term --cov-report=xml --cov-fail-under=70 -v --tb=short
+        pytest tests/integration/ --cov=. --cov-report=term --cov-report=xml --cov-fail-under=70 -v --tb=short
       env:
         MOCK_SERVER_URL: http://localhost:1080
         GECKODRIVER_PATH: /usr/local/bin/geckodriver
