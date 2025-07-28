@@ -58,7 +58,7 @@ def mock_webdriver(monkeypatch):
     yield mock_driver
 
 @pytest.mark.parametrize("webdriver_type", ["firefox", "chrome"])
-def test_integration_login_attempt_and_check_success():
+def test_integration_login_attempt_and_check_success(mock_webdriver, webdriver_type):
     response = login_attempt(
         username="testuser",
         password="wrongpassword",
