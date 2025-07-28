@@ -61,7 +61,7 @@ run_bandit_scan() {
         mkdir -p security_reports
         
         # Ejecutar Bandit
-        if bandit -r . -f json -o security_reports/bandit-report.json 2>/dev/null; then
+        if bandit -r . --exclude tests,htmlcov,venv,.venv,.git -f json -o security_reports/bandit-report.json 2>/dev/null; then
             log "Bandit scan completed successfully"
             
             # Verificar si hay issues críticos
@@ -79,7 +79,7 @@ run_bandit_scan() {
             fi
             
             # Mostrar resumen en texto
-            bandit -r . -f txt | tail -10
+            bandit -r . --exclude tests,htmlcov,venv,.venv,.git -f txt | tail -10
         else
             error "Bandit scan failed"
         fi
