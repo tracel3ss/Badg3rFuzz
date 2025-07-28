@@ -43,20 +43,16 @@ class TestCoreFunction:
         monkeypatch.setattr("selenium.webdriver.Firefox", lambda *a, **k: mock_driver)
         monkeypatch.setattr("selenium.webdriver.Chrome", lambda *a, **k: mock_driver)
         yield mock_driver
-
-    def test_generar_token_y_cookie(mock_webdriver):
+    @pytest.mark.parametrize("webdriver_type", ["firefox", "chrome"])
+    def test_generar_token_y_cookie(mock_webdriver, webdriver_type):
         site_key = "6LfKj9EpAAAAAP8xQ7R2vN5mT6wU3bY8zC1dE4fG"
         captcha_action = "login"
         login_url = "http://test.com/login"
-        with patch("badg3rfuzz.webdriver.Firefox") as mock_driver:
-            mock_driver_instance = mock_driver.return_value
-            mock_driver_instance.execute_script.return_value = "test_token_123"
-            mock_driver_instance.get_cookies.return_value = [{"name": "session", "value": "test123"}]
-            
-            token, cookies = generar_token_y_cookie(site_key, captcha_action, login_url, webdriver_type="firefox")
 
-            assert token == "test_token_123"
-            assert cookies == {"session": "test123"}
+        token, cookies = generar_token_y_cookie(site_key, captcha_action, login_url, webdriver_type=webdriver_type)
+
+        assert token == "test_token_123"
+        assert cookies == {"session": "test123"}
 
     def test_cargar_diccionario_file_not_exists(self):
         """Test cargar diccionario con archivo inexistente"""
