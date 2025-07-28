@@ -1,7 +1,7 @@
 # tests/integration/test_check_success_integration.py
 import pytest
 from requests.models import Response
-from badg3rfuzz import check_success
+from badg3rfuzz import check_success, login_attempt
 
 @pytest.mark.integration
 @pytest.mark.parametrize("text,cookies,status_code,expected_success", [
@@ -47,7 +47,16 @@ def test_check_success_full_json_case():
 
     assert success is False
     assert reason == "JSON Result=False: Credenciales incorrectas"
-
+@pytest.fixture
+def mock_webdriver(monkeypatch):
+    mock_driver = Mock()
+    mock_driver.get_cookies.return_value = [{"name": "session", "value": "test123"}]
+    mock_driver.execute_script.return_value = "test_token_123"
+    monkeypatch.setattr("selenium.webdriver.Firefox", lambda *a, **k: mock_driver)
+    monkeypatch.setattr("selenium.webdriver.Chrome", lambda *a, **k: mock_driver)
+    yield mock_driver
+    
+@pytest.mark.parametrize("webdriver_type", ["firefox", "chrome"])
 def test_integration_login_attempt_and_check_success():
     response = login_attempt(
         username="testuser",
@@ -57,7 +66,7 @@ def test_integration_login_attempt_and_check_success():
         login_url="https://example.com/login",
         post_url="https://example.com/login",
         verbose=False,
-        webdriver_type="mock",  # Deberías tener una opción mock o stub
+        webdriver_type=webdriver_type,  # Deberías tener una opción mock o stub
     )
 
     success, reason = check_success(
