@@ -4,47 +4,57 @@ from unittest.mock import patch
 from badg3rfuzz import main
 
 @pytest.mark.integration
-def test_main_entrypoint(monkeypatch, tmp_path):
-    user_file = tmp_path / "users.txt"
-    pass_file = tmp_path / "pass.txt"
-    user_file.write_text("admin\n")
-    pass_file.write_text("123456\n")
-
+@patch('builtins.print')
+def test_main_entrypoint(mock_print):
+    """Test del punto de entrada principal"""
+    
+    # Mock de argumentos de línea de comandos
     test_args = [
-        "badg3rfuzz.py",
-        "--site-key", "dummy",
-        "--captcha-action", "login",
-        "--login-url", "http://test/login",
-        "--post-url", "http://test/post",
-        "--user-file", str(user_file),
-        "--pass-file", str(pass_file),
-        "--threads", "2",
-        "--stop-on-success"
+        'badg3rfuzz.py',
+        '--url', 'https://example.com/login',
+        '--userlist', 'users.txt',
+        '--passlist', 'passwords.txt',
+        '--threads', '1'
     ]
-    monkeypatch.setattr(sys, "argv", test_args)
+    
+    # Mock de archivos de usuarios y contraseñas
+    mock_users = "admin\nuser\ntest"
+    mock_passwords = "123456\npassword\nadmin"
+    
+    with patch('sys.argv', test_args):
+        with patch('builtins.open', mock_open_multiple_files({
+            'users.txt': mock_users,
+            'passwords.txt': mock_passwords
+        })):
+            with patch('badg3rfuzz.login_attempt') as mock_login:
+                # Simular un login exitoso
+                mock_response = Mock()
+                mock_response.text = "Welcome admin!"
+                mock_response.status_code = 200
+                mock_response.cookies = {"sessionid": "success"}
+                mock_response.url = "https://example.com/dashboard"
+                mock_response.history = [Mock()]
+                mock_login.return_value = mock_response
+                
+                with patch('badg3rfuzz.check_success') as mock_check:
+                    mock_check.return_value = (True, "Success pattern detected: welcome")
+                    
+                    # Ejecutar main
+                    try:
+                        main()
+                    except SystemExit:
+                        pass  # Es esperado que main() termine con sys.exit()
+    
+    # Verificar que se imprimió el mensaje de login válido
+    print_calls = [str(call) for call in mock_print.call_args_list]
+    assert any("Valid Login Found" in call_str and "admin:123456" in call_str for call_str in print_calls)
 
-    with patch("badg3rfuzz.os._exit") as mock_exit, \
-         patch("badg3rfuzz.login_attempt") as mock_login_attempt, \
-         patch("badg3rfuzz.generar_token_y_cookie", return_value=("mocked_token", {"sessionid": "abc123"})), \
-         patch("badg3rfuzz.print") as mock_print, \
-         patch("badg3rfuzz.worker") as mock_worker:
-
-        # Simular respuesta exitosa para login_attempt
-        mock_resp = type("MockResp", (), {
-            "status_code": 200,
-            "text": "Welcome back",
-            "cookies": {"session": "xyz"},
-            "json": lambda: {"Result": True}
-        })()
-        mock_login_attempt.return_value = mock_resp
-
-        # Hacer que worker imprima directamente, sin threads
-        def fake_worker(*args, **kwargs):
-            print("[+] Valid Login Found! admin:123456")
-
-        mock_worker.side_effect = fake_worker
-
-        main()
-
-        mock_exit.assert_called_once()
-        assert any("Valid Login Found" in str(c) for c in mock_print.call_args_list)
+def mock_open_multiple_files(files_dict):
+    """Helper para mockear múltiples archivos"""
+    def mock_open_wrapper(*args, **kwargs):
+        filename = args[0]
+        if filename in files_dict:
+            return mock_open(read_data=files_dict[filename])(*args, **kwargs)
+        else:
+            raise FileNotFoundError(f"No such file: {filename}")
+    return mock_open_wrapper
