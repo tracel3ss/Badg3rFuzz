@@ -34,6 +34,14 @@ jobs:
         python-version: ${{ env.PYTHON_VERSION }}
         cache: 'pip'
     
+    - name: Cache pip
+      uses: actions/cache@v3
+      with:
+        path: ~/.cache/pip
+        key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+        restore-keys: |
+          ${{ runner.os }}-pip-    
+
     - name: Install base dependencies
       run: |
         python -m pip install --upgrade pip
@@ -93,25 +101,39 @@ jobs:
       run: |
         sudo apt-get update
         sudo apt-get install -y \
-          firefox \
-          chromium-browser \
           xvfb \
           openssl \
           ca-certificates
     
+    - name: Cache pip
+      uses: actions/cache@v3
+      with:
+        path: ~/.cache/pip
+        key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+        restore-keys: |
+          ${{ runner.os }}-pip-      
+
     - name: Install Python dependencies
       run: |
         python -m pip install --upgrade pip
         pip install -e .[dev,test]
         if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
     
+    - name: Install Firefox
+      if: matrix.browser == 'firefox'
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y firefox    
+
     - name: Get latest Geckodriver version
+      if: matrix.browser == 'firefox'
       id: geckodriver-version
       run: |
         LATEST=$(curl -s https://api.github.com/repos/mozilla/geckodriver/releases/latest | jq -r .tag_name)
         echo "GECKODRIVER_VERSION=$LATEST" >> $GITHUB_ENV
 
     - name: Download Geckodriver ${{ env.GECKODRIVER_VERSION }}
+      if: matrix.browser == 'firefox'
       run: |
         wget -O geckodriver.tar.gz https://github.com/mozilla/geckodriver/releases/download/${{ env.GECKODRIVER_VERSION }}/geckodriver-${{ env.GECKODRIVER_VERSION }}-linux64.tar.gz
         tar -xzf geckodriver.tar.gz
@@ -119,14 +141,17 @@ jobs:
         sudo mv geckodriver /usr/local/bin/
 
     - name: Install Chrome
+      if: matrix.browser == 'chrome'
       uses: browser-actions/setup-chrome@v1
 
     - name: Get Chrome version
+      if: matrix.browser == 'chrome'
       id: get-chrome-version
       run: |
         echo "CHROME_VERSION=$(google-chrome --version | grep -oP '\d+\.\d+\.\d+')" >> $GITHUB_ENV
 
     - name: Get matching ChromeDriver version
+      if: matrix.browser == 'chrome'
       id: get-chromedriver-version
       run: |
         DRIVER_VERSION=$(curl -s "https://googlechromelabs.github.io/chrome-for-testing/last-known-good-versions-with-downloads.json" \
@@ -134,6 +159,7 @@ jobs:
         echo "DRIVER_VERSION=$DRIVER_VERSION" >> $GITHUB_ENV  
         
     - name: Download ChromeDriver
+      if: matrix.browser == 'chrome'
       run: |
         wget https://edgedl.me.gvt1.com/edgedl/chrome/chrome-for-testing/${{ env.DRIVER_VERSION }}/linux64/chromedriver-linux64.zip
         unzip chromedriver-linux64.zip
@@ -151,8 +177,8 @@ jobs:
           --browser=${{ matrix.browser }} || true
       env:
         BROWSER: ${{ matrix.browser }}
-        GECKODRIVER_PATH: ./geckodriver
-        CHROMEDRIVER_PATH: ./chromedriver
+        GECKODRIVER_PATH: /usr/local/bin/geckodriver
+        CHROMEDRIVER_PATH: /usr/local/bin/chromedriver
     
     - name: Upload coverage reports
       uses: codecov/codecov-action@v3
@@ -167,6 +193,11 @@ jobs:
     name: Integration Tests
     needs: unit-tests
     
+    strategy:
+      matrix:
+        python-version: ["3.9", "3.10", "3.11"]
+        browser: ["firefox", "chrome"]
+
     services:
       # Mock web server para testing
       mockserver:
@@ -183,20 +214,36 @@ jobs:
         python-version: ${{ env.PYTHON_VERSION }}
         cache: 'pip'
     
+    - name: Cache pip
+      uses: actions/cache@v3
+      with:
+        path: ~/.cache/pip
+        key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+        restore-keys: |
+          ${{ runner.os }}-pip-    
+
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
         pip install -e .[dev,test]
         if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
-        sudo apt-get update && sudo apt-get install -y firefox xvfb
+        sudo apt-get update && sudo apt-get install -y xvfb
     
+    - name: Install Firefox
+      if: matrix.browser == 'firefox'
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y firefox
+
     - name: Get latest Geckodriver version
+      if: matrix.browser == 'firefox'
       id: geckodriver-version
       run: |
         LATEST=$(curl -s https://api.github.com/repos/mozilla/geckodriver/releases/latest | jq -r .tag_name)
         echo "GECKODRIVER_VERSION=$LATEST" >> $GITHUB_ENV
 
-    - name: Download Geckodriver ${{ env.GECKODRIVER_VERSION }}
+    - name: Download & Install Geckodriver ${{ env.GECKODRIVER_VERSION }}
+      if: matrix.browser == 'firefox'
       run: |
         wget -O geckodriver.tar.gz https://github.com/mozilla/geckodriver/releases/download/${{ env.GECKODRIVER_VERSION }}/geckodriver-${{ env.GECKODRIVER_VERSION }}-linux64.tar.gz
         tar -xzf geckodriver.tar.gz
@@ -204,14 +251,17 @@ jobs:
         sudo mv geckodriver /usr/local/bin/
 
     - name: Install Chrome
+      if: matrix.browser == 'chrome'
       uses: browser-actions/setup-chrome@v1
 
     - name: Get Chrome version
+      if: matrix.browser == 'chrome'
       id: get-chrome-version
       run: |
         echo "CHROME_VERSION=$(google-chrome --version | grep -oP '\d+\.\d+\.\d+')" >> $GITHUB_ENV
 
     - name: Get matching ChromeDriver version
+      if: matrix.browser == 'chrome'
       id: get-chromedriver-version
       run: |
         DRIVER_VERSION=$(curl -s "https://googlechromelabs.github.io/chrome-for-testing/last-known-good-versions-with-downloads.json" \
@@ -219,6 +269,7 @@ jobs:
         echo "DRIVER_VERSION=$DRIVER_VERSION" >> $GITHUB_ENV  
         
     - name: Download ChromeDriver
+      if: matrix.browser == 'chrome'
       run: |
         wget https://edgedl.me.gvt1.com/edgedl/chrome/chrome-for-testing/${{ env.DRIVER_VERSION }}/linux64/chromedriver-linux64.zip
         unzip chromedriver-linux64.zip
@@ -235,7 +286,8 @@ jobs:
         pytest tests/integration/ --cov=badg3rfuzz --cov-report=term --cov-report=xml --cov-fail-under=70 -v --tb=short
       env:
         MOCK_SERVER_URL: http://localhost:1080
-        GECKODRIVER_PATH: ./geckodriver
+        GECKODRIVER_PATH: /usr/local/bin/geckodriver
+        CHROMEDRIVER_PATH: /usr/local/bin/chromedriver
 
   # Job 4: Tests de seguridad específicos
   security-tests:
@@ -246,11 +298,20 @@ jobs:
     steps:
     - uses: actions/checkout@v4
     
+
     - name: Set up Python ${{ env.PYTHON_VERSION }}
       uses: actions/setup-python@v4
       with:
         python-version: ${{ env.PYTHON_VERSION }}
     
+    - name: Cache pip
+      uses: actions/cache@v3
+      with:
+        path: ~/.cache/pip
+        key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+        restore-keys: |
+          ${{ runner.os }}-pip-
+        
     - name: Install security testing tools
       run: |
         python -m pip install --upgrade pip
@@ -288,6 +349,14 @@ jobs:
       with:
         python-version: ${{ env.PYTHON_VERSION }}
     
+    - name: Cache pip
+      uses: actions/cache@v3
+      with:
+        path: ~/.cache/pip
+        key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+        restore-keys: |
+          ${{ runner.os }}-pip-    
+
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
@@ -314,6 +383,14 @@ jobs:
       with:
         python-version: ${{ env.PYTHON_VERSION }}
     
+    - name: Cache pip
+      uses: actions/cache@v3
+      with:
+        path: ~/.cache/pip
+        key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+        restore-keys: |
+          ${{ runner.os }}-pip-
+        
     - name: Install build dependencies
       run: |
         python -m pip install --upgrade pip
@@ -358,5 +435,6 @@ jobs:
         fi
         
         if [ -f safety-report.json ]; then
-          echo "- Dependency vulnerability scan completed" >> $GITHUB_STEP_SUMMARY
+          echo "- Vulnerable dependencies detected:" >> $GITHUB_STEP_SUMMARY
+          jq '.vulnerabilities[] | "- \(.package_name) \(.affected_versions): \(.issue_severity)"' safety-report.json >> $GITHUB_STEP_SUMMARY
         fi
