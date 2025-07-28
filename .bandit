@@ -1,0 +1,7 @@
+# .bandit
+exclude_dirs:
+  - tests
+  - htmlcov
+  - venv
+  - .venv
+  - .git

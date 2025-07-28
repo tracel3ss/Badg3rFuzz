@@ -58,8 +58,8 @@ jobs:
     
     - name: Security analysis with Bandit
       run: |
-        bandit -r . --exclude tests,htmlcov,venv,.venv,.git -f json -o bandit-report.json || true
-        bandit -r . --exclude tests,htmlcov,venv,.venv,.git -f txt
+        bandit -r . -c .bandit -f json -o bandit-report.json || true
+        bandit -r . -c .bandit -f txt
       continue-on-error: true
     
     - name: Check dependencies for vulnerabilities
