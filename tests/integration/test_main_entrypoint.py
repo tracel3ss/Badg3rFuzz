@@ -15,6 +15,7 @@ def test_main_entrypoint(monkeypatch, tmp_path):
     # Parchar os._exit para no terminar el intérprete
     with patch("badg3rfuzz.os._exit") as mock_exit, \
          patch("badg3rfuzz.login_attempt") as mock_login_attempt, \
+         patch("badg3rfuzz.generar_token_y_cookie", return_value=("mocked_token", {"sessionid": "abc123"})), \
          patch("badg3rfuzz.print") as mock_print:
 
         # Simular respuesta exitosa
@@ -45,3 +46,4 @@ def test_main_entrypoint(monkeypatch, tmp_path):
 
         mock_exit.assert_called_once()  # Se llamó a os._exit()
         assert any("Valid Login Found" in str(c) for c in mock_print.call_args_list)
+

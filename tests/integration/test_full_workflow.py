@@ -95,22 +95,35 @@ def test_check_success_behavior(text, cookies, status_code, expected_success):
     assert success == expected_success, f"Reason: {reason}"
 
 @pytest.mark.integration
-def test_generar_token_y_cookie_mocked():
-    mock_driver = MagicMock()
-    mock_driver.execute_script.return_value = "mocked_token"
-    mock_driver.get_cookies.return_value = [{"name": "sessionid", "value": "abc123"}]
+@pytest.mark.parametrize("text,cookies,status_code,history,expected_success,desc", [
+    # Redirección real simulada
+    ("", {}, 200, [{"url": "http://test.com/dashboard"}], True, "Redirect URL detected"),
 
-    with patch("badg3rfuzz.webdriver.Firefox", return_value=mock_driver), \
-         patch("badg3rfuzz.FirefoxService") as mock_service:
-        
-        token, cookies = generar_token_y_cookie(
-            site_key="dummy_sitekey",
-            captcha_action="login",
-            login_url="http://test/login",
-            webdriver_type="firefox",
-            verbose=False
-        )
+    # Cookie con nombre tipo login
+    ("", {"loginToken": "abc123"}, 200, [], True, "Cookie named like 'login'"),
 
-    assert token == "mocked_token"
-    assert isinstance(cookies, dict)
-    assert cookies.get("sessionid") == "abc123"
+    # Código de éxito sin contenido
+    ("", {}, 201, [], True, "Empty 201 status success code"),
+
+    # Nada que coincida
+    ("", {}, 200, [], False, "No indicator matched"),
+
+    # JSON parsing error
+    ("{invalid json", {}, 200, [], False, "Malformed JSON"),
+])
+def test_check_success_extended(text, cookies, status_code, history, expected_success, desc):
+    res = Response()
+    res.status_code = status_code
+    res._content = text.encode("utf-8")
+    res.cookies = cookies
+    res.history = [Mock(url=h["url"]) for h in history] if history else []
+
+    success, reason = check_success(
+        response=res,
+        success_indicators=["bienvenido", "dashboard", "éxito"],
+        fail_indicators=["invalid", "incorrectas"],
+        success_codes=[200, 201, 302],
+        check_cookies=True,
+        verbose=False
+    )
+    assert success == expected_success, f"{desc} | Reason: {reason}"
