@@ -142,7 +142,7 @@ jobs:
 
     - name: Install Chrome
       if: matrix.browser == 'chrome'
-      uses: browser-actions/setup-chrome@v1
+      uses: browser-actions/setup-chrome@v2
 
     - name: Get Chrome version
       if: matrix.browser == 'chrome'
@@ -252,7 +252,7 @@ jobs:
 
     - name: Install Chrome
       if: matrix.browser == 'chrome'
-      uses: browser-actions/setup-chrome@v1
+      uses: browser-actions/setup-chrome@v2
 
     - name: Get Chrome version
       if: matrix.browser == 'chrome'
