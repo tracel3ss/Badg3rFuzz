@@ -28,7 +28,9 @@
 ## 🔥 Key Features
 
 ### Core Capabilities
+* **Auto-Detection Engine**: Automatically detects reCAPTCHA site-keys, POST URLs, form fields, and CSRF tokens
 * **reCAPTCHA v3 Bypass**: Automated token generation with `site-key` + `action` support
+* **Playwright Engine**: Modern browser automation replacing legacy Selenium drivers
 * **Multi-threaded Architecture**: High-performance parallel processing for maximum efficiency
 * **Intelligent Success Detection**: Multi-layer analysis including content patterns, HTTP codes, redirects, and session cookies
 * **Advanced Fuzzing Engine**: Multiple fuzzer types with configurable parameters
@@ -37,15 +39,18 @@
 
 ### Professional Features
 * **Smart Pattern Recognition**: Configurable success/fail indicators with built-in common patterns
+* **CSRF Interception**: Automatic extraction and handling of dynamic tokens
+* **Advanced Attack Modes**: Sniper, Gutling, and Auto modes for different attack strategies
+* **Custom Request Structure**: Flexible pattern-based request customization
+* **Email Integration**: Support for email-based authentication attacks
 * **Rate Limiting & Stealth**: Configurable delays, jitter, and User-Agent rotation
 * **Graceful Shutdown**: Clean resource management with proper signal handling
 * **Comprehensive Logging**: Detailed attack logs with timestamps and results
 * **Real-time Progress**: Live progress bar with ETA and performance metrics
-* **WebDriver Flexibility**: Support for both Firefox (recommended) and Chrome
 
 ### Security & Compliance
 * **Professional Use**: Designed for authorized penetration testing and security audits
-* **Resource Management**: Automatic cleanup of temporary files and WebDriver instances
+* **Resource Management**: Automatic cleanup of temporary files and browser contexts
 * **Error Handling**: Robust exception handling and recovery mechanisms
 
 ---
@@ -58,32 +63,125 @@
 * **Memory**: Minimum 2GB RAM (4GB+ recommended for large wordlists)
 
 ### Browser Requirements
-* **Firefox (Recommended)**:
-  - Windows: Download from [https://mozilla.org/firefox](https://mozilla.org/firefox)
-  - Linux: `sudo apt install firefox` or `sudo yum install firefox`
-  - macOS: Download from Mozilla website
-  - **Critical**: Place `geckodriver.exe` in the same directory as the script
-
-* **Chrome (Alternative)**:
-  - Install Google Chrome from [https://google.com/chrome](https://google.com/chrome)
-  - WebDriver automatically managed via `webdriver-manager`
+* **Playwright Browsers**: Automatically managed, no manual setup required
+  - **Firefox (Recommended)**: `playwright install firefox`
+  - **Chromium**: `playwright install chromium`
+  - **No manual driver downloads needed**
 
 ### Python Dependencies
 ```bash
 pip install -r requirements.txt
 ```
 
-### WebDriver Setup
-- **Firefox**: Download `geckodriver` from [GitHub Releases](https://github.com/mozilla/geckodriver/releases)
-- **Chrome**: Automatically handled by `webdriver-manager`
+### Browser Setup
+```bash
+# Install Playwright browsers (required)
+playwright install firefox
+playwright install chromium
+
+# Install system dependencies (Linux)
+sudo playwright install-deps
+```
+
+---
+
+## 🤖 Auto-Detection Engine
+
+Badg3rFuzz includes an intelligent auto-detection engine that automatically discovers:
+
+### Automatic Form Detection
+- **reCAPTCHA Site-key**: Detects from data-sitekey attributes, script sources, and inline JavaScript
+- **POST URL**: Identifies authentication endpoints from form actions
+- **Form Fields**: Maps username, password, email, and token fields
+- **CAPTCHA Actions**: Extracts actions from grecaptcha.execute calls
+- **CSRF Tokens**: Intercepts and extracts dynamic security tokens
+
+### Auto-Detection Usage
+```bash
+# Full automatic mode (detects everything automatically)
+python badg3rfuzz.py --login-url https://target.com/login --yes
+
+# Combine auto-detection with manual wordlists
+python badg3rfuzz.py \
+  --login-url https://target.com/login \
+  --user-file users.txt \
+  --pass-file passwords.txt \
+  --yes
+
+# Disable auto-detection (classic mode)
+python badg3rfuzz.py \
+  --no-auto-detect \
+  --site-key MANUAL_KEY \
+  --post-url https://target.com/api/login \
+  --login-url https://target.com/login
+```
+
+---
+
+## ⚔️ Attack Modes
+
+### Attack Mode: Auto (Default)
+- Full cartesian product of usernames × passwords
+- Maximum coverage of all possible combinations
+
+### Attack Mode: Sniper  
+- Systematic attack with multiple wordlists
+- Ideal for targeted and methodical attacks
+
+### Attack Mode: Gutling
+- Uses single wordlist for both username and password
+- Efficient for credentials following patterns
+
+```bash
+# Examples by mode
+--attack-mode auto      # user1:pass1, user1:pass2, user2:pass1...
+--attack-mode sniper    # Systematic wordlist iteration
+--attack-mode gutling   # Same list for username and password
+```
+
+---
+
+## 🔧 Custom Request Structure
+
+Define custom request structures with flexible patterns:
+
+### Available Patterns
+- `^USER^` - Replaced by username
+- `^PASS^` - Replaced by password  
+- `^EMAIL^` - Replaced by email (if provided)
+- `^CAPTCHA^` - Replaced by reCAPTCHA token
+- `^TOKEN1^`, `^TOKEN2^` - Additional numbered tokens
+
+### Examples
+```bash
+# Custom form structure
+--custom-structure "username=^USER^&password=^PASS^&captcha_token=^CAPTCHA^"
+
+# Custom JSON API  
+--custom-structure '{"user":"^USER^","pass":"^PASS^","email":"^EMAIL^","token":"^CAPTCHA^"}'
+
+# Multiple tokens
+--custom-structure "user=^USER^&pass=^PASS^&csrf_token=^TOKEN1^&captcha=^CAPTCHA^"
+```
 
 ---
 
 ## 🚀 Basic Usage
 
-### Simple Brute Force Attack
+### Simple Auto-Detection Attack
 ```bash
 python badg3rfuzz.py \
+  --login-url https://target.com/login \
+  --user-file users.txt \
+  --pass-file passwords.txt \
+  --threads 10 \
+  --yes
+```
+
+### Manual Configuration (Classic Mode)
+```bash
+python badg3rfuzz.py \
+  --no-auto-detect \
   --site-key 6LfKj9EpAAAAAP8xQ7R2vN5mT6wU3bY8zC1dE4fG \
   --captcha-action login \
   --login-url https://target.com/login \
@@ -97,28 +195,24 @@ python badg3rfuzz.py \
 ### Quick Username Fuzzing
 ```bash
 python badg3rfuzz.py \
-  --site-key YOUR_SITE_KEY \
-  --captcha-action submit_form \
   --login-url https://target.com/auth \
-  --post-url https://target.com/login \
   --user-fuzz digits:6:8:500 \
   --pass-file common-passwords.txt \
-  --threads 15
+  --threads 15 \
+  --yes
 ```
 
 ---
 
 ## ⚙️ Advanced Usage Examples
 
-### Professional Security Assessment
+### Professional Security Assessment with Auto-Detection
 ```bash
 python badg3rfuzz.py \
-  --site-key 6LfKj9EpAAAAAP8xQ7R2vN5mT6wU3bY8zC1dE4fG \
-  --captcha-action login_attempt \
   --login-url https://secure.example.com/auth \
-  --post-url https://secure.example.com/api/authenticate \
   --user-file usernames.txt \
   --pass-file rockyou.txt \
+  --attack-mode sniper \
   --threads 8 \
   --webdriver chrome \
   --success-indicators "dashboard" "welcome" "profile" \
@@ -128,18 +222,28 @@ python badg3rfuzz.py \
   --jitter 1.0 \
   --proxy-file proxies.txt \
   --user-agents-file user-agents.txt \
-  --origin-url https://secure.example.com \
   --stop-on-success \
+  --yes \
   --verbose
+```
+
+### Custom Structure Attack
+```bash
+python badg3rfuzz.py \
+  --login-url https://api.target.com/login \
+  --custom-structure '{"username":"^USER^","password":"^PASS^","email":"^EMAIL^","recaptcha":"^CAPTCHA^"}' \
+  --user-file users.txt \
+  --pass-file passwords.txt \
+  --email-file emails.txt \
+  --attack-mode gutling \
+  --threads 5 \
+  --yes
 ```
 
 ### Stealth Mode with SSL Bypass
 ```bash
 python badg3rfuzz.py \
-  --site-key 6LfKj9EpAAAAAP8xQ7R2vN5mT6wU3bY8zC1dE4fG \
-  --captcha-action auth \
   --login-url https://internal.corp.com/login \
-  --post-url https://internal.corp.com/api/login \
   --user-fuzz mix:8:12:200 \
   --pass-file passwords.txt \
   --threads 5 \
@@ -148,22 +252,21 @@ python badg3rfuzz.py \
   --disable-ssl-verify \
   --proxy http://proxy.corp.com:8080 \
   --user-agents-file browsers.txt \
-  --no-banner
+  --no-banner \
+  --yes
 ```
 
 ### Custom CA Certificate Environment
 ```bash
 python badg3rfuzz.py \
-  --site-key 6LfKj9EpAAAAAP8xQ7R2vN5mT6wU3bY8zC1dE4fG \
-  --captcha-action login \
   --login-url https://private.company.com/auth \
-  --post-url https://private.company.com/login \
   --user-file employees.txt \
   --pass-file company-passwords.txt \
   --ca-cert /path/to/company-ca.crt \
   --threads 3 \
   --delay 1.0 \
-  --verbose
+  --verbose \
+  --yes
 ```
 
 ---
@@ -173,10 +276,27 @@ python badg3rfuzz.py \
 ### Required Parameters
 | Parameter           | Description                                                                | Example                              |
 | ------------------- | -------------------------------------------------------------------------- | ------------------------------------ |
+| `--login-url`       | URL where reCAPTCHA widget is loaded (required)                          | `https://target.com/login`           |
+
+### Auto-Detection Parameters
+| Parameter           | Description                                                                | Default      |
+| ------------------- | -------------------------------------------------------------------------- | ------------ |
+| `--yes`             | Auto-accept all prompts and use auto-detected values                      | Prompt user  |
+| `--no-auto-detect`  | Disable auto-detection and use only manual parameters                     | Auto-detect  |
+
+### Manual Configuration (Optional with Auto-Detection)
+| Parameter           | Description                                                                | Example                              |
+| ------------------- | -------------------------------------------------------------------------- | ------------------------------------ |
 | `--site-key`        | Public reCAPTCHA key for token generation                                 | `6LfKj9EpAAAAAP8xQ7R2vN5mT6wU3bY8zC1dE4fG` |
 | `--captcha-action`  | reCAPTCHA action parameter                                                 | `login`, `submit_form`, `authenticate` |
-| `--login-url`       | URL where reCAPTCHA widget is loaded                                      | `https://target.com/login`           |
 | `--post-url`        | Endpoint receiving authentication POST requests                            | `https://target.com/api/auth`        |
+
+### Attack Configuration
+| Parameter           | Description                                                                | Default    | Options                    |
+| ------------------- | -------------------------------------------------------------------------- | ---------- | -------------------------- |
+| `--attack-mode`     | Attack strategy mode                                                       | auto       | `auto`, `sniper`, `gutling` |
+| `--custom-structure`| Custom request structure with patterns                                    | None       | See patterns section       |
+| `--email-file`      | File with email addresses for attacks                                     | None       | Text file                  |
 
 ### Authentication Sources (Choose One)
 | Parameter      | Description                                                    | Format                              |
@@ -215,7 +335,7 @@ python badg3rfuzz.py \
 | Parameter           | Description                                           | Default      |
 | ------------------- | ----------------------------------------------------- | ------------ |
 | `--stop-on-success` | Stop execution on first valid credentials            | Continue     |
-| `--webdriver`       | WebDriver engine: `firefox` or `chrome`              | firefox      |
+| `--webdriver`       | Browser engine: `firefox` or `chrome`                | firefox      |
 | `--verbose`         | Enable detailed debug output                          | Quiet        |
 | `--no-banner`       | Disable ASCII art banner                              | Show banner  |
 
@@ -312,12 +432,19 @@ Badg3rFuzz employs a sophisticated multi-layer detection system:
 
 ### Console Output
 ```
-🦡 Badg3rFuzz v1.0
+🦡 Badg3rFuzz v1.1
 Start: 26-07-2025 15:30:45
 
 [>] Initializing Badg3rFuzz modules...
+[>] Running auto-detection on https://target.com/login...
+[✔] Auto-detection completed!
+    Site-key: 6LfKj9EpAAAAAP8xQ7R2vN5mT6wU3bY8zC1dE4fG
+    POST URL: https://target.com/api/authenticate
+    Captcha Action: login
+    Form fields: 4 detected
 [>] Loading fuzzing payloads and brute force wordlists...
-[>] 2000 combo prepares.
+[>] 2000 combinations prepared.
+[>] Attack mode: AUTO
 [>] 15 proxies loaded
 [>] Ready to fuzz and bruteforce your targets! 🦡💥
 [>] Starting 10 threads...
@@ -350,7 +477,8 @@ Enable with `--verbose` for detailed debugging:
 - Header information
 - JSON response parsing
 - Success detection analysis
-- WebDriver operations
+- Auto-detection process
+- Playwright browser operations
 
 ---
 
@@ -359,48 +487,30 @@ Enable with `--verbose` for detailed debugging:
 ### Quick Setup
 ```bash
 # Clone repository
-git clone https://github.com/yourusername/badg3rfuzz.git
-cd badg3rfuzz
+git clone https://github.com/tracel3ss/Badg3rFuzz.git
+cd Badg3rFuzz
 
-# Install dependencies
+# Install Python dependencies
 pip install -r requirements.txt
 
-# Download geckodriver (Firefox users)
-# Place geckodriver.exe in the script directory
+# Install Playwright browsers (required)
+playwright install firefox
+playwright install chromium
+
+# Install system dependencies (Linux only)
+sudo playwright install-deps
 ```
 
-### WebDriver Configuration
-
-#### Firefox Setup (Recommended)
-1. **Install Firefox**: Download from [Mozilla](https://mozilla.org/firefox)
-2. **Download GeckoDriver**:
-   ```bash
-   # Linux/macOS
-   wget https://github.com/mozilla/geckodriver/releases/latest/download/geckodriver-v0.33.0-linux64.tar.gz
-   tar -xzf geckodriver-v0.33.0-linux64.tar.gz
-   chmod +x geckodriver
-   ```
-   
-   **Windows**: Download `.zip` and extract `geckodriver.exe`
-
-3. **Placement**: Put `geckodriver` in the same directory as `badg3rfuzz.py`
-
-#### Chrome Setup (Alternative)
-- Install Google Chrome
-- No manual WebDriver setup required
-- Use `--webdriver chrome`
-
-### File Structure
+### File Structure 
 ```
 badg3rfuzz/
-├── badg3rfuzz.py          # Main script
-├── geckodriver            # Firefox WebDriver (Linux/macOS)
-├── geckodriver.exe        # Firefox WebDriver (Windows)
-├── requirements.txt       # Python dependencies
+├── badg3rfuzz.py          # Main script latest version
+├── requirements.txt       # Updated dependencies  
 ├── README.md              # This file
 ├── wordlists/             # Optional directory
 │   ├── usernames.txt
 │   ├── passwords.txt
+│   ├── emails.txt         # NEW: Email addresses
 │   ├── user-agents.txt
 │   └── proxies.txt
 └── logs/                  # Auto-created for logs
@@ -412,17 +522,26 @@ badg3rfuzz/
 
 ### Common Issues and Solutions
 
-#### WebDriver Problems
-**Problem**: `geckodriver.exe not found`
+#### Playwright/Browser Problems
+**Problem**: Browser installation fails
 ```bash
-# Solution: Download and place in script directory
-wget https://github.com/mozilla/geckodriver/releases/latest/download/geckodriver-v0.33.0-linux64.tar.gz
+# Solution: Manual browser installation with dependencies
+playwright install --with-deps firefox
+playwright install --with-deps chromium
 ```
 
-**Problem**: Browser windows appear despite headless mode
+**Problem**: Permission errors on Linux
 ```bash
-# Solution: Use Chrome or update Firefox
-python badg3rfuzz.py --webdriver chrome [other options]
+# Solution: Install system dependencies
+sudo playwright install-deps
+sudo apt-get install libnss3 libnspr4 libatk-bridge2.0-0 libdrm2
+```
+
+**Problem**: Browser not found errors
+```bash
+# Solution: Verify installation
+playwright install --help
+which python # Ensure correct Python environment
 ```
 
 #### Network Issues
@@ -438,6 +557,19 @@ python badg3rfuzz.py --webdriver chrome [other options]
 --disable-ssl-verify
 # OR
 --ca-cert /path/to/company-ca.crt
+```
+
+#### Auto-Detection Issues
+**Problem**: Auto-detection fails
+```bash
+# Solution: Use manual mode with verbose output
+--no-auto-detect --verbose --site-key MANUAL_KEY --post-url MANUAL_URL
+```
+
+**Problem**: Incorrect auto-detected values
+```bash
+# Solution: Review detected values and use manual override
+# Tool will prompt for confirmation unless --yes is used
 ```
 
 #### Performance Issues
@@ -549,20 +681,19 @@ Usage:
 
 ## 📋 Professional Use Cases
 
-### Penetration Testing
+### Penetration Testing with Auto-Detection
 ```bash
-# External assessment
+# External assessment with full automation
 python badg3rfuzz.py \
-  --site-key TARGET_SITE_KEY \
-  --captcha-action login \
   --login-url https://target.com/login \
-  --post-url https://target.com/api/auth \
   --user-file users.txt \
   --pass-file passwords.txt \
+  --attack-mode sniper \
   --threads 10 \
   --stop-on-success \
   --proxy-file proxies.txt \
   --delay 1.0 \
+  --yes \
   --verbose
 ```
 
@@ -570,32 +701,41 @@ python badg3rfuzz.py \
 ```bash
 # Internal network testing
 python badg3rfuzz.py \
-  --site-key INTERNAL_SITE_KEY \
-  --captcha-action authenticate \
   --login-url https://internal.company.com/auth \
-  --post-url https://internal.company.com/login \
   --user-file employees.txt \
   --pass-file common-passwords.txt \
   --ca-cert /etc/ssl/company-ca.crt \
   --threads 5 \
   --delay 2.0 \
-  --success-indicators "welcome" "dashboard"
+  --success-indicators "welcome" "dashboard" \
+  --yes
+```
+
+### API Security Testing
+```bash
+# JSON API testing with custom structure
+python badg3rfuzz.py \
+  --login-url https://api.target.com/login \
+  --custom-structure '{"username":"^USER^","password":"^PASS^","captcha_response":"^CAPTCHA^"}' \
+  --user-file api-users.txt \
+  --pass-file api-passwords.txt \
+  --attack-mode gutling \
+  --threads 8 \
+  --yes
 ```
 
 ### Compliance Testing
 ```bash
 # Password policy validation
 python badg3rfuzz.py \
-  --site-key COMPLIANCE_SITE_KEY \
-  --captcha-action test \
   --login-url https://compliance.site.com/test \
-  --post-url https://compliance.site.com/validate \
   --user-fuzz digits:8:8:100 \
   --pass-file weak-passwords.txt \
   --threads 3 \
   --delay 3.0 \
   --stop-on-success \
-  --verbose
+  --verbose \
+  --yes
 ```
 
 ---
@@ -685,22 +825,25 @@ consequences resulting from unauthorized use of this tool.
 
 ## 🔄 Updates and Versioning
 
-### Current Version: v1.0
+### Current Version: v1.1 ✅
 
 ### Recent Improvements
-- ✅ Multi-layer success detection engine
-- ✅ Proxy rotation and authentication
-- ✅ SSL/TLS flexibility with custom CAs
-- ✅ Advanced rate limiting and stealth features
-- ✅ Robust error handling and cleanup
-- ✅ Professional logging and reporting
+- ✅ **Auto-Detection Engine**: Automatically detects site-keys, POST URLs, form fields, and CSRF tokens
+- ✅ **Playwright Migration**: Complete migration from Selenium to modern Playwright engine  
+- ✅ **Advanced Attack Modes**: Sniper, Gutling, and Auto modes for different strategies
+- ✅ **Custom Request Structure**: Flexible pattern-based request customization with ^USER^, ^PASS^, etc.
+- ✅ **CSRF Interception**: Automatic interception and handling of dynamic security tokens
+- ✅ **Email Integration**: Support for email-based authentication attacks
+- ✅ **Enhanced Error Handling**: Robust exception handling and graceful shutdown mechanisms
+- ✅ **Improved Resource Management**: Better cleanup of browser contexts and temporary files
 
 ### Roadmap
-- [ ] **v1.1**: GUI interface for easier operation
-- [ ] **v1.2**: Advanced reporting with JSON/XML output
-- [ ] **v1.3**: Machine learning-based success detection
-- [ ] **v1.4**: Plugin architecture for custom modules
-- [ ] **v1.5**: Distributed testing across multiple machines
+- [x] **v1.1**: Auto-Detection of form field and ReCaptcha info
+- [ ] **v1.2**: Machine learning-based success detection algorithms
+- [ ] **v1.3**: Plugin architecture for custom authentication modules
+- [ ] **v1.4**: Distributed testing across multiple machines
+- [ ] **v1.5**: Advanced reporting with JSON/XML output formats
+- [ ] **v1.6**: GUI interface for easier operation
 
 ---
 
@@ -736,31 +879,40 @@ Your support helps maintain and improve professional security tools.
 
 ---
 
-## 📋 Updated Requirements
+## 📋 Updated Requirements v1.1
 
 ### requirements.txt
 ```
 requests>=2.25.0
-selenium>=4.15.0
-webdriver-manager>=4.0.0
+playwright>=1.40.0
+nest-asyncio>=1.5.0
 ```
 
 ### Installation
 ```bash
+# Install Python dependencies
 pip install -r requirements.txt
+
+# Install Playwright browsers (required)
+playwright install firefox
+playwright install chromium
+
+# Install system dependencies (Linux only)
+sudo playwright install-deps
 ```
 
 ---
 
 ## 🏆 Acknowledgments
 
-- **Selenium Team**: For robust WebDriver automation
+- **Playwright Team**: For modern, reliable browser automation
 - **reCAPTCHA Research Community**: For insights into CAPTCHA mechanisms
 - **Security Community**: For feedback and feature requests
-- **Beta Testers**: Professional penetration testers who provided feedback
+- **Beta Testers**: Professional penetration testers who provided v1.1 feedback
+- **Open Source Contributors**: For continuous improvements and bug reports
 
 ---
 
-**Badg3rFuzz v1.0** - Professional cybersecurity auditing made efficient 🦡💥
+**Badg3rFuzz v1.1** - Next-generation cybersecurity auditing with intelligent automation 🦡💥
 
 *Developed by professionals, for professionals.*
