@@ -26,7 +26,7 @@ jobs:
     name: Static Analysis & Linting
     
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v5
     
     - name: Set up Python ${{ env.PYTHON_VERSION }}
       uses: actions/setup-python@v4
@@ -89,7 +89,7 @@ jobs:
         browser: ["firefox", "chrome"]
     
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v5
     
     - name: Set up Python ${{ matrix.python-version }}
       uses: actions/setup-python@v4
@@ -206,7 +206,7 @@ jobs:
           - 1080:1080
     
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v5
     
     - name: Set up Python ${{ env.PYTHON_VERSION }}
       uses: actions/setup-python@v4
@@ -296,7 +296,7 @@ jobs:
     needs: static-analysis
     
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v5
     
 
     - name: Set up Python ${{ env.PYTHON_VERSION }}
@@ -342,7 +342,7 @@ jobs:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v5
     
     - name: Set up Python ${{ env.PYTHON_VERSION }}
       uses: actions/setup-python@v4
@@ -376,7 +376,7 @@ jobs:
     if: github.event_name == 'push'
     
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v5
     
     - name: Set up Python ${{ env.PYTHON_VERSION }}
       uses: actions/setup-python@v4
