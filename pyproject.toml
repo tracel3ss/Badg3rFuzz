@@ -29,7 +29,7 @@ classifiers = [
     "Topic :: System :: Systems Administration",
 ]
 dependencies = [
-    "selenium>=4.15.0",
+    "selenium>=4.36.0",
     "requests>=2.31.0",
     "webdriver-manager>=4.0.0",
     "urllib3>=2.0.0",
